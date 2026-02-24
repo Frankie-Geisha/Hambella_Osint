@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 from openai import OpenAI
 import json
 import os
+from supabase import create_client, Client # 🌟 新增：数据库通信工具
 
 # ==========================================
 # 🌸 1. 网页基础与密码门
@@ -27,9 +28,14 @@ if not st.session_state.authenticated:
     st.stop() 
 
 # ==========================================
-# 🌸 2. 核心配置区
+# 🌸 2. 核心配置与云端连接
 # ==========================================
 API_KEY = st.secrets["DEEPSEEK_API_KEY"]
+
+# 🌟 初始化 Supabase 数据库连接
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 channel_urls = [
     "https://t.me/s/ejdailyru", "https://t.me/s/Ateobreaking", "https://t.me/s/theinsider", 
@@ -47,22 +53,16 @@ channel_urls = [
     "https://t.me/s/Russian_OSINT", "https://t.me/s/alter_academy", "https://t.me/s/rybar_mena",
     "https://t.me/s/rybar_pacific", "https://t.me/s/mosnews", "https://t.me/s/brieflyru"
 ]
-
 VIP_CHANNELS = ["anserenko", "kremlin_sekret","rybar","Russian_OSINT","rybar_mena","rybar_pacific","topwar_official"] 
-BOOKMARK_FILE = "bookmark.json"
 
+# 书签系统暂时保留本地机制，未来V3.0再将其云端化
+BOOKMARK_FILE = "bookmark.json"
 def load_bookmarks():
     if os.path.exists(BOOKMARK_FILE):
-        with open(BOOKMARK_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+        with open(BOOKMARK_FILE, "r", encoding="utf-8") as f: return json.load(f)
     return {}
-
 def save_bookmarks(bookmarks):
-    with open(BOOKMARK_FILE, "w", encoding="utf-8") as f:
-        json.dump(bookmarks, f)
-
-if 'intelligence_cards' not in st.session_state:
-    st.session_state.intelligence_cards = []
+    with open(BOOKMARK_FILE, "w", encoding="utf-8") as f: json.dump(bookmarks, f)
 
 # ==========================================
 # 🌸 3. 左侧战术侧边栏 (Sidebar)
@@ -72,23 +72,24 @@ with st.sidebar:
     st.caption("操作员：最高指挥官")
     st.markdown("---")
     
-    # 抓取按钮移到了这里
     run_btn = st.button("🚀 启动全网深度侦察", use_container_width=True, type="primary")
     
     st.markdown("---")
     st.subheader("🎯 情报筛选器")
-    # 添加过滤组件
     filter_category = st.selectbox("领域锁定：", ["全部领域", "China Nexus", "Espionage", "Kremlin Core", "RU Local Event", "Global Macro"])
     filter_score = st.slider("最低威胁分阀值：", 0, 100, 0)
     
+    # 新增：协作状态过滤
+    filter_assignee = st.selectbox("人员追踪：", ["全部人员", "未分配", "张三", "李四", "王五"])
+    
     st.markdown("---")
-    st.caption("🌸 花魁 OSINT v2.0 | Powered by DeepSeek & Streamlit")
+    st.caption("🌸 花魁 OSINT v2.0 | Supabase 强力驱动")
 
 # ==========================================
-# 🌸 4. 抓取与大脑提炼逻辑 (仅当点击按钮时运行)
+# 🌸 4. 抓取并【写入数据库】逻辑
 # ==========================================
 if run_btn:
-    with st.spinner('花魁正在隐秘抓取并呼叫大脑进行深度解析，请稍候...'):
+    with st.spinner('花魁正在隐秘抓取并呼叫大脑，随后将刻录至云端数据库...'):
         try:
             bookmarks = load_bookmarks()
             raw_intelligence = ""
@@ -105,8 +106,7 @@ if run_btn:
                     soup = BeautifulSoup(response.text, 'html.parser')
                     message_blocks = soup.find_all('div', class_='tgme_widget_message')
                     
-                    if last_read_id == 0:
-                        message_blocks = message_blocks[-5:] 
+                    if last_read_id == 0: message_blocks = message_blocks[-5:] 
                         
                     channel_new_text = ""
                     for block in message_blocks:
@@ -123,94 +123,87 @@ if run_btn:
                         is_vip = "【🔴 VIP 必须提炼】" if channel_name in VIP_CHANNELS else ""
                         raw_intelligence += f"\n\n--- 来源：{channel_name} {is_vip} ---\n" + channel_new_text
                         bookmarks[channel_name] = highest_id
-                        
                 except Exception as e:
                     pass 
 
             save_bookmarks(bookmarks)
             
             if new_msg_count == 0:
-                st.sidebar.success("巡逻完毕，今日暂无更新。")
+                st.sidebar.success("今日暂无更新。")
             else:
                 client = OpenAI(api_key=API_KEY, base_url="https://api.deepseek.com")
                 system_prompt = """
-                你是一位顶级的地缘政治与开源情报（OSINT）首席分析官。
-                请分析我提供的多频道 Telegram 原始消息。
+                你是一位顶级的地缘政治与开源情报（OSINT）首席分析官。请分析我提供的多频道原始消息。
+                任务：剔除闲聊，将核心价值浓缩成独立情报（VIP频道必须提取）。输出严格的简体中文。
+                挑选出最具战略价值的前 10-15 条。
                 
-                【你的核心任务】：
-                1. 剔除广告、无意义闲聊。将有价值的信息浓缩成独立的情报。
-                2. 针对标有“【🔴 VIP 必须提炼】”的内容，务必单独生成情报。
-                3. ⚠️ 输出的标题和内容必须是**专业、严谨的简体中文**！
+                分类代号：China Nexus / Espionage / Kremlin Core / RU Local Event / Global Macro
+                评分标准：0-100分。
                 
-                严格挑选出最具战略价值的前 10 到 15 条情报进行汇报。
-                
-                【情报分类代号】：
-                - China Nexus
-                - Espionage
-                - Kremlin Core
-                - RU Local Event
-                - Global Macro
-                
-                【打分标准】：评估“战略影响指数”(0-100分)。
-                
-                输出合法 JSON 格式，如下：
-                {
-                    "reports": [
-                        {"title": "中文标题", "summary": "中文概述", "category": "英文代号", "score": 85, "source": "频道名称"}
-                    ]
-                }
+                输出合法 JSON：{"reports": [{"title": "","summary": "","category": "","score": 85,"source": ""}]}
                 """
                 ai_response = client.chat.completions.create(
                     model="deepseek-chat",
                     messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": raw_intelligence}],
-                    response_format={"type": "json_object"}, 
-                    max_tokens=4000, 
-                    stream=False
+                    response_format={"type": "json_object"}, max_tokens=4000, stream=False
                 )
                 
                 parsed_data = json.loads(ai_response.choices[0].message.content)
-                st.session_state.intelligence_cards = parsed_data.get("reports", [])
+                reports = parsed_data.get("reports", [])
+                
+                # 🌟🌟🌟 核心进化：把 AI 吐出的数据，一条条刻进 Supabase 数据库！
+                for rep in reports:
+                    supabase.table("intelligence_db").insert({
+                        "title": rep.get("title", "无标题"),
+                        "summary": rep.get("summary", "无内容"),
+                        "category": rep.get("category", "Global Macro"),
+                        "score": rep.get("score", 0),
+                        "source": rep.get("source", "未知渠道")
+                    }).execute()
+                
+                st.sidebar.success(f"✅ 成功截获 {len(reports)} 条绝密情报并已永久归档至云端！")
                 
         except Exception as e:
             st.error(f"任务故障：{e}")
 
 # ==========================================
-# 🌸 5. 右侧主屏幕：大盘数据与情报卡片
+# 🌸 5. 右侧主屏幕：从数据库【读取】与实时交互
 # ==========================================
-st.title("🌸 战略情报指挥中心 (主屏幕)")
+st.title("🌸 战略情报指挥中心 (实时大屏)")
 
-# 如果有情报，先显示顶部仪表板
-if len(st.session_state.intelligence_cards) > 0:
-    # 计算一些宏观数据
-    total_reports = len(st.session_state.intelligence_cards)
-    high_risk_count = sum(1 for card in st.session_state.intelligence_cards if card.get('score', 0) >= 80)
-    china_nexus_count = sum(1 for card in st.session_state.intelligence_cards if card.get('category') == 'China Nexus')
+# 🌟 从 Supabase 数据库拉取所有情报（按 ID 倒序，最新的在前面）
+try:
+    db_response = supabase.table("intelligence_db").select("*").order("id", desc=True).execute()
+    db_cards = db_response.data
+except Exception as e:
+    st.error(f"数据库连接异常，请检查网络或密钥：{e}")
+    db_cards = []
+
+if len(db_cards) > 0:
+    total_reports = len(db_cards)
+    high_risk_count = sum(1 for card in db_cards if card.get('score', 0) >= 80)
+    china_nexus_count = sum(1 for card in db_cards if card.get('category') == 'China Nexus')
     
-    # 渲染顶部三个大数字仪表盘
     col1, col2, col3 = st.columns(3)
-    col1.metric(label="📄 今日截获极密情报", value=f"{total_reports} 份")
-    col2.metric(label="🔴 80分以上高危预警", value=f"{high_risk_count} 起", delta="需长官重点批示", delta_color="inverse")
-    col3.metric(label="🇨🇳 涉华动向 (China Nexus)", value=f"{china_nexus_count} 起")
-    
+    col1.metric("📄 数据库历史沉淀", f"{total_reports} 份")
+    col2.metric("🔴 历史高危预警", f"{high_risk_count} 起", "需长官批示", delta_color="inverse")
+    col3.metric("🇨🇳 涉华动向档案", f"{china_nexus_count} 起")
     st.markdown("---")
 
-    # 根据侧边栏的“漏斗”过滤情报
+    # 经过漏斗过滤
     filtered_cards = []
-    for card in st.session_state.intelligence_cards:
+    for card in db_cards:
         match_category = (filter_category == "全部领域") or (card.get('category') == filter_category)
         match_score = card.get('score', 0) >= filter_score
+        match_assignee = (filter_assignee == "全部人员") or (card.get('assignee') == filter_assignee)
         
-        if match_category and match_score:
+        if match_category and match_score and match_assignee:
             filtered_cards.append(card)
             
-    # 对过滤后的卡片排序
-    sorted_cards = sorted(filtered_cards, key=lambda x: x.get('score', 0), reverse=True)
-    
-    # 循环渲染卡片
-    if len(sorted_cards) == 0:
-        st.info("💡 当前筛选条件下没有符合标准的情报。请尝试在左侧侧边栏放宽过滤条件。")
+    if len(filtered_cards) == 0:
+        st.info("💡 当前筛选条件下无匹配情报。")
     else:
-        for index, card in enumerate(sorted_cards):
+        for card in filtered_cards:
             score = card.get('score', 0)
             if score >= 80: border_color = "🔴"
             elif score >= 60: border_color = "🟡"
@@ -218,19 +211,32 @@ if len(st.session_state.intelligence_cards) > 0:
                 
             with st.container(border=True):
                 st.markdown(f"### {border_color} [{score}分] {card.get('category')} | {card.get('title')}")
-                st.caption(f"📡 来源：{card.get('source')} | 🕵️ 整理者：花魁 AI")
+                # 增加了时间戳展示
+                time_str = card.get('created_at', '')[:10]
+                st.caption(f"📡 来源：{card.get('source')} | 🕵️ 录入时间：{time_str} | 📌 当前负责人：**{card.get('assignee', '未分配')}**")
                 st.write(card.get('summary'))
                 
                 st.markdown("---")
-                c1, c2, c3, c4 = st.columns([1, 1, 1, 2])
+                c1, c2, c3 = st.columns([1, 1, 2])
                 with c1:
-                    if st.button("👍 确认价值", key=f"like_{index}"): st.toast("已赞")
+                    # 🌟 真实数据库交互：修改状态
+                    current_status = card.get('status', '待核实')
+                    status_options = ["待核实", "跟进中", "已归档"]
+                    new_status = st.selectbox("更新状态", status_options, index=status_options.index(current_status), key=f"status_{card['id']}", label_visibility="collapsed")
+                    if new_status != current_status:
+                        supabase.table("intelligence_db").update({"status": new_status}).eq("id", card['id']).execute()
+                        st.toast(f"状态已更新为：{new_status}")
+                        st.rerun()
                 with c2:
-                    if st.button("⭐ 归档", key=f"save_{index}"): st.toast("已入库")
+                    # 🌟 真实数据库交互：分配任务给组员
+                    current_assignee = card.get('assignee', '未分配')
+                    team_members = ["未分配", "张三", "李四", "王五"]
+                    new_assignee = st.selectbox("分配组员", team_members, index=team_members.index(current_assignee), key=f"assign_{card['id']}", label_visibility="collapsed")
+                    if new_assignee != current_assignee:
+                        supabase.table("intelligence_db").update({"assignee": new_assignee}).eq("id", card['id']).execute()
+                        st.toast(f"任务已强制派发给：{new_assignee}")
+                        st.rerun() # 立即刷新网页，你会看到负责人的名字变了！
                 with c3:
-                    assignee = st.selectbox("分配任务", ["选择组员", "张三", "李四"], key=f"assign_{index}", label_visibility="collapsed")
-                    if assignee != "选择组员": st.toast(f"已指派给 {assignee}")
-                with c4:
-                    st.text_input("批示：", placeholder="输入批示后回车...", key=f"comment_{index}", label_visibility="collapsed")
+                    st.write(f"🏷️ 当前追踪状态：`{current_status}`")
 else:
-    st.info("👈 长官，请在左侧【战术控制台】点击启动按钮，唤醒花魁为您进行全网侦察。")
+    st.info("👈 报告长官，数据库目前为空。请在侧边栏点击启动按钮，执行第一次入库作业！")
