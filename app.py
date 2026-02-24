@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 from openai import OpenAI
 import json
 import os
-from supabase import create_client, Client # 🌟 新增：数据库通信工具
+from supabase import create_client, Client
 
 # ==========================================
 # 🌸 1. 网页基础与密码门
@@ -32,7 +32,6 @@ if not st.session_state.authenticated:
 # ==========================================
 API_KEY = st.secrets["DEEPSEEK_API_KEY"]
 
-# 🌟 初始化 Supabase 数据库连接
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -55,14 +54,30 @@ channel_urls = [
 ]
 VIP_CHANNELS = ["anserenko", "kremlin_sekret","rybar","Russian_OSINT","rybar_mena","rybar_pacific","topwar_official"] 
 
-# 书签系统暂时保留本地机制，未来V3.0再将其云端化
-BOOKMARK_FILE = "bookmark.json"
+# 🌟🌟🌟 全新云端书签系统：彻底抛弃本地 json！ 🌟🌟🌟
 def load_bookmarks():
-    if os.path.exists(BOOKMARK_FILE):
-        with open(BOOKMARK_FILE, "r", encoding="utf-8") as f: return json.load(f)
-    return {}
+    try:
+        # 去 Supabase 拿书签
+        response = supabase.table("bookmarks_db").select("*").execute()
+        bookmarks = {}
+        for row in response.data:
+            bookmarks[row['channel_name']] = row['last_read_id']
+        return bookmarks
+    except Exception as e:
+        print(f"读取云端书签失败: {e}")
+        return {}
+
 def save_bookmarks(bookmarks):
-    with open(BOOKMARK_FILE, "w", encoding="utf-8") as f: json.dump(bookmarks, f)
+    try:
+        # 将最新的书签批量写入 Supabase
+        data_to_upsert = [{"channel_name": k, "last_read_id": v} for k, v in bookmarks.items()]
+        if data_to_upsert:
+            supabase.table("bookmarks_db").upsert(data_to_upsert).execute()
+    except Exception as e:
+        print(f"保存云端书签失败: {e}")
+
+if 'intelligence_cards' not in st.session_state:
+    st.session_state.intelligence_cards = []
 
 # ==========================================
 # 🌸 3. 左侧战术侧边栏 (Sidebar)
@@ -78,18 +93,16 @@ with st.sidebar:
     st.subheader("🎯 情报筛选器")
     filter_category = st.selectbox("领域锁定：", ["全部领域", "China Nexus", "Espionage", "Kremlin Core", "RU Local Event", "Global Macro"])
     filter_score = st.slider("最低威胁分阀值：", 0, 100, 0)
-    
-    # 新增：协作状态过滤
     filter_assignee = st.selectbox("人员追踪：", ["全部人员", "未分配", "张三", "李四", "王五"])
     
     st.markdown("---")
-    st.caption("🌸 花魁 OSINT v2.0 | Supabase 强力驱动")
+    st.caption("🌸 花魁 OSINT v2.0 | 纯云端持久化架构")
 
 # ==========================================
-# 🌸 4. 抓取并【写入数据库】逻辑
+# 🌸 4. 抓取与分析入库
 # ==========================================
 if run_btn:
-    with st.spinner('花魁正在隐秘抓取并呼叫大脑，随后将刻录至云端数据库...'):
+    with st.spinner('花魁正在核对云端书签，执行深度侦察与中文翻译...'):
         try:
             bookmarks = load_bookmarks()
             raw_intelligence = ""
@@ -129,19 +142,26 @@ if run_btn:
             save_bookmarks(bookmarks)
             
             if new_msg_count == 0:
-                st.sidebar.success("今日暂无更新。")
+                st.sidebar.success("云端书签比对完毕，全网暂无更新。")
             else:
                 client = OpenAI(api_key=API_KEY, base_url="https://api.deepseek.com")
+                
+                # 🎯 永久锁死的严格翻译指令
                 system_prompt = """
-                你是一位顶级的地缘政治与开源情报（OSINT）首席分析官。请分析我提供的多频道原始消息。
-                任务：剔除闲聊，将核心价值浓缩成独立情报（VIP频道必须提取）。输出严格的简体中文。
-                挑选出最具战略价值的前 10-15 条。
+                你是一位顶级的地缘政治与开源情报（OSINT）首席分析官。
+                请分析我提供的多频道原始消息（包含大量俄语、英语等外文生肉）。
+                
+                【核心任务】：
+                1. 剔除闲聊，提炼独立情报。VIP频道必须单独生成。
+                2. ⚠️ 极其重要（最高指令）：无论原文语言为何，最终输出的标题和内容都必须彻底翻译为**专业、严谨的简体中文**！绝对不允许出现未翻译的外文生肉！
+                
+                严格挑选出最具战略价值的前 15-20 条。
                 
                 分类代号：China Nexus / Espionage / Kremlin Core / RU Local Event / Global Macro
                 评分标准：0-100分。
-                
-                输出合法 JSON：{"reports": [{"title": "","summary": "","category": "","score": 85,"source": ""}]}
+                输出合法 JSON：{"reports": [{"title": "中文标题","summary": "中文概述","category": "","score": 85,"source": ""}]}
                 """
+                
                 ai_response = client.chat.completions.create(
                     model="deepseek-chat",
                     messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": raw_intelligence}],
@@ -151,7 +171,6 @@ if run_btn:
                 parsed_data = json.loads(ai_response.choices[0].message.content)
                 reports = parsed_data.get("reports", [])
                 
-                # 🌟🌟🌟 核心进化：把 AI 吐出的数据，一条条刻进 Supabase 数据库！
                 for rep in reports:
                     supabase.table("intelligence_db").insert({
                         "title": rep.get("title", "无标题"),
@@ -161,22 +180,21 @@ if run_btn:
                         "source": rep.get("source", "未知渠道")
                     }).execute()
                 
-                st.sidebar.success(f"✅ 成功截获 {len(reports)} 条绝密情报并已永久归档至云端！")
+                st.sidebar.success(f"✅ 成功截获 {len(reports)} 条中文情报并永久归档！")
                 
         except Exception as e:
             st.error(f"任务故障：{e}")
 
 # ==========================================
-# 🌸 5. 右侧主屏幕：从数据库【读取】与实时交互
+# 🌸 5. 右侧主屏幕 (实时交互层)
 # ==========================================
 st.title("🌸 战略情报指挥中心 (实时大屏)")
 
-# 🌟 从 Supabase 数据库拉取所有情报（按 ID 倒序，最新的在前面）
 try:
     db_response = supabase.table("intelligence_db").select("*").order("id", desc=True).execute()
     db_cards = db_response.data
 except Exception as e:
-    st.error(f"数据库连接异常，请检查网络或密钥：{e}")
+    st.error(f"数据库连接异常：{e}")
     db_cards = []
 
 if len(db_cards) > 0:
@@ -190,13 +208,11 @@ if len(db_cards) > 0:
     col3.metric("🇨🇳 涉华动向档案", f"{china_nexus_count} 起")
     st.markdown("---")
 
-    # 经过漏斗过滤
     filtered_cards = []
     for card in db_cards:
         match_category = (filter_category == "全部领域") or (card.get('category') == filter_category)
         match_score = card.get('score', 0) >= filter_score
         match_assignee = (filter_assignee == "全部人员") or (card.get('assignee') == filter_assignee)
-        
         if match_category and match_score and match_assignee:
             filtered_cards.append(card)
             
@@ -211,32 +227,27 @@ if len(db_cards) > 0:
                 
             with st.container(border=True):
                 st.markdown(f"### {border_color} [{score}分] {card.get('category')} | {card.get('title')}")
-                # 增加了时间戳展示
                 time_str = card.get('created_at', '')[:10]
-                st.caption(f"📡 来源：{card.get('source')} | 🕵️ 录入时间：{time_str} | 📌 当前负责人：**{card.get('assignee', '未分配')}**")
+                st.caption(f"📡 来源：{card.get('source')} | 🕵️ 录入：{time_str} | 📌 负责人：**{card.get('assignee', '未分配')}**")
                 st.write(card.get('summary'))
                 
                 st.markdown("---")
                 c1, c2, c3 = st.columns([1, 1, 2])
                 with c1:
-                    # 🌟 真实数据库交互：修改状态
                     current_status = card.get('status', '待核实')
                     status_options = ["待核实", "跟进中", "已归档"]
                     new_status = st.selectbox("更新状态", status_options, index=status_options.index(current_status), key=f"status_{card['id']}", label_visibility="collapsed")
                     if new_status != current_status:
                         supabase.table("intelligence_db").update({"status": new_status}).eq("id", card['id']).execute()
-                        st.toast(f"状态已更新为：{new_status}")
                         st.rerun()
                 with c2:
-                    # 🌟 真实数据库交互：分配任务给组员
                     current_assignee = card.get('assignee', '未分配')
                     team_members = ["未分配", "张三", "李四", "王五"]
                     new_assignee = st.selectbox("分配组员", team_members, index=team_members.index(current_assignee), key=f"assign_{card['id']}", label_visibility="collapsed")
                     if new_assignee != current_assignee:
                         supabase.table("intelligence_db").update({"assignee": new_assignee}).eq("id", card['id']).execute()
-                        st.toast(f"任务已强制派发给：{new_assignee}")
-                        st.rerun() # 立即刷新网页，你会看到负责人的名字变了！
+                        st.rerun()
                 with c3:
-                    st.write(f"🏷️ 当前追踪状态：`{current_status}`")
+                    st.write(f"🏷️ 追踪状态：`{current_status}`")
 else:
     st.info("👈 报告长官，数据库目前为空。请在侧边栏点击启动按钮，执行第一次入库作业！")
