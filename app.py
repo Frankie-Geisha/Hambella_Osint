@@ -29,7 +29,7 @@ if not st.session_state.authenticated:
 # ==========================================
 # 🌸 2. 核心配置区
 # ==========================================
-API_KEY = st.secrets["sk-b48c2f524fe94c91a77becfb7922ff2a"]
+API_KEY = st.secrets["DEEPSEEK_API_KEY"]
 
 channel_urls = [
     "https://t.me/s/ejdailyru", "https://t.me/s/Ateobreaking", "https://t.me/s/theinsider", 
