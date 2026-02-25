@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 from openai import OpenAI
-from google import genai # 🌟 全新换血的官方 SDK
+import anthropic # 🌟 全新接入：Claude 引擎！
 from docx import Document
 from io import BytesIO
 import json
@@ -47,7 +47,7 @@ if not st.session_state.authenticated:
 # 🌸 2. 核心配置与工具函数
 # ==========================================
 DEEPSEEK_API_KEY = st.secrets["DEEPSEEK_API_KEY"]
-GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+ANTHROPIC_API_KEY = st.secrets["ANTHROPIC_API_KEY"] # 🌟 调用 Claude 密钥
 
 channel_urls = [
     "https://t.me/s/ejdailyru","https://t.me/s/Ateobreaking", "https://t.me/s/theinsider", "https://t.me/s/moscowtimes_ru",
@@ -96,7 +96,7 @@ if st.session_state.page == "main":
         filter_category = st.selectbox("领域锁定：", ["全部领域", "China Nexus", "Espionage", "Kremlin Core", "RU Local Event", "Global Macro"])
         filter_score = st.slider("最低威胁分阀值：", 0, 100, 0)
         st.markdown("---")
-        st.caption("🌸 花魁 OSINT v4.0 | 3.1 Pro 超大杯架构")
+        st.caption("🌸 花魁 OSINT v4.0 | Claude 混合架构")
 
     if run_btn:
         with st.spinner('调用 DeepSeek 引擎执行广度侦察与翻译...'):
@@ -207,7 +207,7 @@ if st.session_state.page == "main":
 
 elif st.session_state.page == "deep_dive":
     # ==========================================
-    # 🌸 4. 独立审讯室：Gemini 3.1 Pro 深度挖掘档案库
+    # 🌸 4. 独立审讯室：Claude 3.5 Sonnet 深度挖掘档案库
     # ==========================================
     card = st.session_state.current_report
     st.title("👁️ 深渊凝视：独立战术研判室")
@@ -226,31 +226,40 @@ elif st.session_state.page == "deep_dive":
         st.markdown(final_content)
         
     else:
-        with st.spinner("🧠 正在呼叫 Gemini 3.1 Pro 超大杯引擎，进行全网深层推理与 HUMINT 画像..."):
+        with st.spinner("🧠 正在呼叫 Claude 3.5 Sonnet 引擎，进行全网深层推理与 HUMINT 画像..."):
             try:
-                gemini_prompt = f"""
+                # 🌟 Claude 的提示词分为 System (设定) 和 User (内容)
+                claude_system_prompt = """
                 你是一位隶属于顶尖情报机构的高级 HUMINT（人力情报）与 OSINT 联合分析专家。
-                请基于以下截获的开源情报，调动你强大的网络搜索能力，补充完善情报素材，并进行深度推理，输出《深度研判专报》。
+                你的任务是基于截获的开源情报，调动强大的逻辑推理能力，补充完善情报素材，输出《深度研判专报》。
+                【输出强制要求】必须包含以下 5 个模块（使用 Markdown 排版，语气极其冷峻客观，使用情报简报的文字风格）：
+                1. 🌍 事件背景全貌：该事件的客观全要素情报全貌，深层政治或经济背景。
+                2. 💰 潜在利益链推演：事件各相关方的内部深层考量。请站在事件相关方的利益角度，开展严谨的分析研判。
+                3. 👤 对策建议：站在宏观战略和国家利益角度，提出该事件的潜在影响及应对措施的相关对策建议。
+                4. 🤝 HUMINT 接触突破口 (绝密操作指引)：如果要派特工在线上或线下了解更深层次的情报，应该如何找到并接近该信息源并建立合作，建议采取什么伪装身份（Cover）？切入点是什么？
+                5. 🔗 交叉验证建议：为了核实真伪，特工应去查阅哪些具体的开源数据库（列出方向）？
+                """
+                
+                claude_user_message = f"""
                 【原始线索】：
                 - 标题：{card['title']}
                 - 摘要：{card['summary']}
                 - 来源频道：{card['source']}
                 
-                【输出强制要求】必须包含以下 5 个模块（使用 Markdown 排版，语气极其冷峻客观，使用情报简报的文字风格）：
-                1. 🌍 事件背景全貌：该事件的客观的全要素情报全貌，深层政治或经济背景。
-                2. 💰 潜在利益链推演：事件各相关方的内部深层考量。可以广泛搜索并参考各类网络情报来源，也可以站在事件相关方的利益角度，开展严谨的分析研判。
-                3. 👤 对策建议：站在中国的国家利益角度，提出该事件对中国的影响及应对措施的相关对策建议
-                4. 🤝 HUMINT 接触突破口 (绝密操作指引)：如果要派特工在线上或线下了解更深层次的情报，应该如何找到并接近该信息源并建立合作，建议采取什么伪装身份（Cover）？切入点是什么？
-                5. 🔗 交叉验证建议：为了核实真伪，特工应去查阅哪些具体的开源数据库（列出方向）？
+                请开始撰写《深度研判专报》。
                 """
                 
-                # 🌟 使用全新 SDK 呼叫 3.1 Pro
-                client_gemini = genai.Client(api_key=GEMINI_API_KEY)
-                response = client_gemini.models.generate_content(
-                    model='gemini-2.5-flash', 
-                    contents=gemini_prompt
+                # 🌟 呼叫 Claude API
+                client_claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+                response = client_claude.messages.create(
+                    model="claude-3-5-sonnet-20241022",
+                    max_tokens=4096,
+                    system=claude_system_prompt,
+                    messages=[
+                        {"role": "user", "content": claude_user_message}
+                    ]
                 )
-                final_content = response.text
+                final_content = response.content[0].text
                 
                 supabase.table("deep_dives_db").insert({
                     "report_id": card['id'],
@@ -258,11 +267,11 @@ elif st.session_state.page == "deep_dive":
                     "content": final_content
                 }).execute()
                 
-                st.success(f"🔥 Gemini 3.1 Pro 挖掘完毕！已将此情报永久刻录至团队档案库。")
+                st.success(f"🔥 Claude 引擎挖掘完毕！已将此情报永久刻录至团队档案库。")
                 st.markdown(final_content)
                 
             except Exception as e:
-                st.error(f"Gemini 引擎故障：{e}")
+                st.error(f"Claude 引擎故障：{e}")
                 final_content = ""
 
     if final_content:
