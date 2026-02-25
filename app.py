@@ -277,7 +277,7 @@ elif st.session_state.page == "deep_dive":
                 5. 🔗 交叉验证建议：为了核实真伪，特工应去查阅哪些具体的开源数据库（列出方向）？
                 """
                 
-                model = genai.GenerativeModel('gemini-2.5-pro-latest')
+                model = genai.GenerativeModel('gemini-3.1-pro')
                 response = model.generate_content(gemini_prompt)
                 final_content = response.text
                 
