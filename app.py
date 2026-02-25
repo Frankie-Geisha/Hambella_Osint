@@ -172,24 +172,25 @@ if st.session_state.page == "main":
                     请分析原始消息，浓缩成独立情报，必须彻底翻译为简体中文！
                     
                     ⚠️ 极其重要指令 1：原始文本中带有 [发帖时间: ...]。如果有多个来源讲述同一件事，请提取出其中最早的那个时间，格式为 YYYY-MM-DD HH:MM。
-                    ⚠️ 极其重要指令 2：如果该条信息的来源带有 "【🔴 VIP 必须提炼】" 的标记，你必须在输出的 "summary" 字段的最后，换行加上 "【💎 VIP 原文全译】："，并附上该条消息一字不落的、完整的中文翻译！如果是普通来源，则不需要附带全文。
+                    ⚠️ 极其重要指令 2：如果该条信息的来源带有 "【🔴 VIP 必须提炼】" 的标记，请在输出的 "summary" 字段最后，追加 "【💎 VIP 原文全译】：" 及完整的中文翻译。
+                    ⚠️ 极其重要指令 3（防崩溃最高纪律）：你输出的必须是严格合法的 JSON！JSON 字符串内部的换行必须严格使用 "\\n" 代替，绝对不能直接物理换行！双引号必须用 "\\" 转义！
                     
                     【🎯 核心战术打分量表 (score: 0-100)】：
                     - 90-100分 (极高危/战略级)：将改变地缘格局、重大高层清洗/人事突变、涉华重大负面/核心利益链异动、核潜艇/战略武器调动。
-                    - 70-89分 (高价值线索)：中等规模突发冲突、关键供应链/能源网异动、暴露出值得特工后续追踪的 HUMINT 切入点。
+                    - 70-89分 (高价值线索)：中等规模突发冲突、关键供应链/能源网异动。
                     - 40-69分 (一般情报)：常规战况播报、例行外交辞令、宏观经济数据的一般波动。
                     - 0-39分 (信息噪点)：无意义的政治宣传、未经证实的边缘八卦、日常琐事。（请尽量将此类信息剔除，不要输出）。
                     
                     【输出合法 JSON】：
                     {
                         "reports": [
-                            {"title": "中文标题", "summary": "中文概述（若为VIP则追加全文翻译）", "category": "China Nexus 等代号", "score": 85, "source": "频道", "publish_time": "最早发布时间(YYYY-MM-DD HH:MM)"}
+                            {"title": "中文标题", "summary": "中文概述及VIP全文（注：换行必须用 \\n，注意转义双引号）", "category": "China Nexus 等代号", "score": 85, "source": "频道", "publish_time": "最早发布时间(YYYY-MM-DD HH:MM)"}
                         ]
                     }
                     """
                     ai_response = client.chat.completions.create(
                         model="deepseek-chat", messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": raw_intelligence}],
-                        response_format={"type": "json_object"}, max_tokens=4000
+                        response_format={"type": "json_object"}, max_tokens=8000
                     )
                     reports = json.loads(ai_response.choices[0].message.content).get("reports", [])
                     for rep in reports:
