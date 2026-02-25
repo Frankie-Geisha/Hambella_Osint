@@ -2,8 +2,8 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 from openai import OpenAI
-import google.generativeai as genai # 🌟 新增：Gemini 引擎
-from docx import Document           # 🌟 新增：Word 文档生成器
+import google.generativeai as genai
+from docx import Document
 from io import BytesIO
 import json
 import os
@@ -62,7 +62,6 @@ channel_urls = [
     "https://t.me/s/thehegemonist","https://t.me/s/budni_manipulyatora","https://t.me/s/ManoiloToday","https://t.me/s/rtechnocom",
     "https://t.me/s/darpaandcia","https://t.me/s/istories_media","https://t.me/s/mediazona_exclusive","https://t.me/s/Russian_OSINT",
     "https://t.me/s/alter_academy","https://t.me/s/rybar_mena","https://t.me/s/rybar_pacific","https://t.me/s/mosnews","https://t.me/s/brieflyru"
-    # (为节省代码空间，仅列出部分，你可以把之前的 42 个完整补全)
 ]
 VIP_CHANNELS = ["anserenko", "kremlin_sekret","rybar","Russian_OSINT","rybar_mena","rybar_pacific","topwar_official"] 
 
@@ -145,43 +144,46 @@ if st.session_state.page == "main":
                     st.sidebar.success("暂无更新。")
                 else:
                     client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com")
-                    # 🎯 修复版提示词：最高级别中文翻译强制指令
-                system_prompt = """
-                你是一位顶级的地缘政治与开源情报（OSINT）首席分析官。
-                请分析我提供的多频道原始消息（包含大量俄语、英语等外文生肉）。
-                
-                【你的核心任务】：
-                1. 剔除广告、无意义闲聊。将有价值的信息浓缩成独立的情报。
-                2. 针对标有“【🔴 VIP 必须提炼】”的内容，务必单独生成情报，绝不能遗漏。
-                3. ⚠️ 极其重要（最高指令）：无论原文是什么语言，你最终输出的标题和内容都必须彻底翻译为**专业、严谨的简体中文**！绝对不允许在输出的 JSON 内容中出现未翻译的外文生肉！
-                
-                【数量限制】：严格挑选出最具战略价值的前 10 到 15 条情报。
-                
-                【情报分类代号】：
-                - China Nexus
-                - Espionage
-                - Kremlin Core
-                - RU Local Event
-                - Global Macro
-                
-                【打分标准】：评估“战略影响指数”(0-100分)。
-                
-                【输出格式要求】：必须且只能输出合法的 JSON 格式：
-                {
-                    "reports": [
-                        {
-                            "title": "一句话精炼的中文标题",
-                            "summary": "情报核心内容的详细中文概述（条理清晰，翻译信达雅）",
-                            "category": "上述英文代号之一",
-                            "score": 85,
-                            "source": "频道名称"
-                        }
-                    ]
-                }
-                """
+                    system_prompt = """
+                    你是一位顶级的地缘政治与开源情报（OSINT）首席分析官。
+                    请分析我提供的多频道原始消息（包含大量俄语、英语等外文生肉）。
+                    
+                    【你的核心任务】：
+                    1. 剔除广告、无意义闲聊。将有价值的信息浓缩成独立的情报。
+                    2. 针对标有“【🔴 VIP 必须提炼】”的内容，务必单独生成情报，绝不能遗漏。
+                    3. ⚠️ 极其重要（最高指令）：无论原文是什么语言，你最终输出的标题和内容都必须彻底翻译为**专业、严谨的简体中文**！绝对不允许在输出的 JSON 内容中出现未翻译的外文生肉！
+                    
+                    【数量限制】：严格挑选出最具战略价值的前 10 到 15 条情报。
+                    
+                    【情报分类代号】：
+                    - China Nexus
+                    - Espionage
+                    - Kremlin Core
+                    - RU Local Event
+                    - Global Macro
+                    
+                    【打分标准】：评估“战略影响指数”(0-100分)。
+                    
+                    【输出格式要求】：必须且只能输出合法的 JSON 格式：
+                    {
+                        "reports": [
+                            {
+                                "title": "一句话精炼的中文标题",
+                                "summary": "情报核心内容的详细中文概述（条理清晰，翻译信达雅）",
+                                "category": "上述英文代号之一",
+                                "score": 85,
+                                "source": "频道名称"
+                            }
+                        ]
+                    }
+                    """
+                    
+                    # 修复了这里的缩进对齐问题
                     ai_response = client.chat.completions.create(
-                        model="deepseek-chat", messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": raw_intelligence}],
-                        response_format={"type": "json_object"}, max_tokens=4000
+                        model="deepseek-chat", 
+                        messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": raw_intelligence}],
+                        response_format={"type": "json_object"}, 
+                        max_tokens=4000
                     )
                     reports = json.loads(ai_response.choices[0].message.content).get("reports", [])
                     for rep in reports:
@@ -228,11 +230,10 @@ if st.session_state.page == "main":
                         supabase.table("comments_db").insert({"report_id": card['id'], "agent_name": st.session_state.current_user, "content": comment_text}).execute()
                         st.rerun()
                 with c3:
-                    # 🌟 核心机关：点击按钮，瞬间跳转到“深度挖掘”专属页面！
                     if st.button("🔍 深度挖掘", key=f"btn_d_{card['id']}", use_container_width=True, type="secondary"):
                         st.session_state.current_report = card
-                        st.session_state.page = "deep_dive" # 修改路由状态
-                        st.rerun() # 重新渲染网页
+                        st.session_state.page = "deep_dive" 
+                        st.rerun() 
 
 elif st.session_state.page == "deep_dive":
     # ==========================================
@@ -252,16 +253,13 @@ elif st.session_state.page == "deep_dive":
     deep_res = supabase.table("deep_dives_db").select("*").eq("report_id", card['id']).execute()
     
     if len(deep_res.data) > 0:
-        # 如果别人挖过了，直接白嫖数据！
         st.success(f"💾 历史档案调取成功！本报告由特工 **{deep_res.data[0]['agent_name']}** 耗费 AI 算力挖掘，现为您免费呈现。")
         final_content = deep_res.data[0]['content']
         st.markdown(final_content)
         
     else:
-        # 如果是第一次挖，启动 Gemini 引擎！
         with st.spinner("🧠 正在呼叫 Gemini Pro 引擎，进行全网深层推理与 HUMINT 画像..."):
             try:
-                # 针对 HUMINT 定制的超级 Prompt
                 gemini_prompt = f"""
                 你是一位隶属于顶尖情报机构的高级 HUMINT（人力情报）与 OSINT 联合分析专家。
                 请基于以下截获的开源情报，调动你强大的网络搜索能力，补充完善情报素材，并进行深度推理，输出《深度研判专报》。
@@ -283,7 +281,6 @@ elif st.session_state.page == "deep_dive":
                 response = model.generate_content(gemini_prompt)
                 final_content = response.text
                 
-                # 挖掘成功后，存入云端保险柜！
                 supabase.table("deep_dives_db").insert({
                     "report_id": card['id'],
                     "agent_name": st.session_state.current_user,
