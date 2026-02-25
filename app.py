@@ -247,7 +247,7 @@ elif st.session_state.page == "deep_dive":
                 # 🌟 使用全新 SDK 呼叫 3.1 Pro
                 client_gemini = genai.Client(api_key=GEMINI_API_KEY)
                 response = client_gemini.models.generate_content(
-                    model='gemini-3.1-pro-preview', 
+                    model='gemini-2.5-flash', 
                     contents=gemini_prompt
                 )
                 final_content = response.text
