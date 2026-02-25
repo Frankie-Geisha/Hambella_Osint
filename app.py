@@ -7,34 +7,47 @@ import os
 from supabase import create_client, Client
 
 # ==========================================
-# 🌸 1. 网页基础与密码门
+# 🌸 1. 网页基础与【实名认证系统】
 # ==========================================
 st.set_page_config(page_title="花魁 OSINT", page_icon="🌸", layout="wide", initial_sidebar_state="expanded")
 
+# 🌟 初始化 Supabase 数据库连接
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# 登录状态管理
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
+    st.session_state.current_user = ""
 
 if not st.session_state.authenticated:
-    st.title("🔒 绝密区域：请输入访问许可")
+    st.title("🔒 绝密区域：特工身份核验")
     st.markdown("---")
-    pwd = st.text_input("长官，请核验您的访问口令：", type="password")
-    if st.button("验证身份"):
-        if pwd == st.secrets["APP_PASSWORD"]:
+    
+    # 动态获取花名册（这里直接写死列表更快捷，也可以去数据库实时拉取）
+    team_members = ['指挥官', '工程师', '梅潮风', '张可可', '丸子', '听风', '瑰夏', '阿拉比卡', '耶加雪非', '蓝山', '曼特宁']
+    
+    user_name = st.selectbox("请选择特工代号：", team_members)
+    pwd = st.text_input("请输入访问口令：", type="password")
+    
+    if st.button("登录指挥中心", type="primary"):
+        # 🌟 真实数据库校验：去 agents_db 核对账号密码
+        auth_response = supabase.table("agents_db").select("*").eq("agent_name", user_name).eq("password", pwd).execute()
+        
+        if len(auth_response.data) > 0:
             st.session_state.authenticated = True
-            st.success("✅ 身份核验通过！正在开启指挥中心...")
+            st.session_state.current_user = user_name
+            st.success(f"✅ 身份核验通过！欢迎特工：{user_name}")
             st.rerun()
         else:
-            st.error("🚨 警告：授权失败！口令错误！")
+            st.error("🚨 警告：授权失败！口令错误或身份不符！")
     st.stop() 
 
 # ==========================================
 # 🌸 2. 核心配置与云端连接
 # ==========================================
 API_KEY = st.secrets["DEEPSEEK_API_KEY"]
-
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 channel_urls = [
     "https://t.me/s/ejdailyru", "https://t.me/s/Ateobreaking", "https://t.me/s/theinsider", 
@@ -54,37 +67,25 @@ channel_urls = [
 ]
 VIP_CHANNELS = ["anserenko", "kremlin_sekret","rybar","Russian_OSINT","rybar_mena","rybar_pacific","topwar_official"] 
 
-# 🌟🌟🌟 全新云端书签系统：彻底抛弃本地 json！ 🌟🌟🌟
 def load_bookmarks():
     try:
-        # 去 Supabase 拿书签
         response = supabase.table("bookmarks_db").select("*").execute()
-        bookmarks = {}
-        for row in response.data:
-            bookmarks[row['channel_name']] = row['last_read_id']
-        return bookmarks
-    except Exception as e:
-        print(f"读取云端书签失败: {e}")
-        return {}
+        return {row['channel_name']: row['last_read_id'] for row in response.data}
+    except: return {}
 
 def save_bookmarks(bookmarks):
     try:
-        # 将最新的书签批量写入 Supabase
         data_to_upsert = [{"channel_name": k, "last_read_id": v} for k, v in bookmarks.items()]
-        if data_to_upsert:
-            supabase.table("bookmarks_db").upsert(data_to_upsert).execute()
-    except Exception as e:
-        print(f"保存云端书签失败: {e}")
-
-if 'intelligence_cards' not in st.session_state:
-    st.session_state.intelligence_cards = []
+        if data_to_upsert: supabase.table("bookmarks_db").upsert(data_to_upsert).execute()
+    except: pass
 
 # ==========================================
 # 🌸 3. 左侧战术侧边栏 (Sidebar)
 # ==========================================
 with st.sidebar:
     st.title("⚙️ 战术控制台")
-    st.caption("操作员：最高指挥官")
+    # 🌟 动态显示当前登录的用户
+    st.success(f"🟢 在线特工: **{st.session_state.current_user}**")
     st.markdown("---")
     
     run_btn = st.button("🚀 启动全网深度侦察", use_container_width=True, type="primary")
@@ -93,10 +94,9 @@ with st.sidebar:
     st.subheader("🎯 情报筛选器")
     filter_category = st.selectbox("领域锁定：", ["全部领域", "China Nexus", "Espionage", "Kremlin Core", "RU Local Event", "Global Macro"])
     filter_score = st.slider("最低威胁分阀值：", 0, 100, 0)
-    filter_assignee = st.selectbox("人员追踪：", ["全部人员", "未分配", "张三", "李四", "王五"])
     
     st.markdown("---")
-    st.caption("🌸 花魁 OSINT v2.0 | 纯云端持久化架构")
+    st.caption("🌸 花魁 OSINT v3.0 | 团队协作核心版")
 
 # ==========================================
 # 🌸 4. 抓取与分析入库
@@ -146,7 +146,6 @@ if run_btn:
             else:
                 client = OpenAI(api_key=API_KEY, base_url="https://api.deepseek.com")
                 
-                # 🎯 永久锁死的严格翻译指令
                 system_prompt = """
                 你是一位顶级的地缘政治与开源情报（OSINT）首席分析官。
                 请分析我提供的多频道原始消息（包含大量俄语、英语等外文生肉）。
@@ -186,7 +185,7 @@ if run_btn:
             st.error(f"任务故障：{e}")
 
 # ==========================================
-# 🌸 5. 右侧主屏幕 (实时交互层)
+# 🌸 5. 右侧主屏幕 (实名协作留言层)
 # ==========================================
 st.title("🌸 战略情报指挥中心 (实时大屏)")
 
@@ -212,8 +211,7 @@ if len(db_cards) > 0:
     for card in db_cards:
         match_category = (filter_category == "全部领域") or (card.get('category') == filter_category)
         match_score = card.get('score', 0) >= filter_score
-        match_assignee = (filter_assignee == "全部人员") or (card.get('assignee') == filter_assignee)
-        if match_category and match_score and match_assignee:
+        if match_category and match_score:
             filtered_cards.append(card)
             
     if len(filtered_cards) == 0:
@@ -228,26 +226,37 @@ if len(db_cards) > 0:
             with st.container(border=True):
                 st.markdown(f"### {border_color} [{score}分] {card.get('category')} | {card.get('title')}")
                 time_str = card.get('created_at', '')[:10]
-                st.caption(f"📡 来源：{card.get('source')} | 🕵️ 录入：{time_str} | 📌 负责人：**{card.get('assignee', '未分配')}**")
+                st.caption(f"📡 来源：{card.get('source')} | 🕵️ 录入：{time_str}")
                 st.write(card.get('summary'))
                 
+                # 🌟🌟🌟 新增：读取并展示这条情报的所有实名留言 🌟🌟🌟
+                comments_res = supabase.table("comments_db").select("*").eq("report_id", card['id']).order("created_at", desc=False).execute()
+                if len(comments_res.data) > 0:
+                    st.markdown("---")
+                    st.caption("💬 **战术讨论区：**")
+                    for c in comments_res.data:
+                        # 格式化时间，去掉尾巴上的时区后缀
+                        c_time = c['created_at'][:16].replace('T', ' ')
+                        st.markdown(f"**🕵️ {c['agent_name']}** `{c_time}` : {c['content']}")
+                
                 st.markdown("---")
-                c1, c2, c3 = st.columns([1, 1, 2])
+                
+                # 🌟🌟🌟 新增：实名留言框与深度挖掘大招 🌟🌟🌟
+                c1, c2, c3 = st.columns([2, 1, 1])
                 with c1:
-                    current_status = card.get('status', '待核实')
-                    status_options = ["待核实", "跟进中", "已归档"]
-                    new_status = st.selectbox("更新状态", status_options, index=status_options.index(current_status), key=f"status_{card['id']}", label_visibility="collapsed")
-                    if new_status != current_status:
-                        supabase.table("intelligence_db").update({"status": new_status}).eq("id", card['id']).execute()
-                        st.rerun()
+                    comment_text = st.text_input("📝 添加战术批示...", key=f"input_{card['id']}", label_visibility="collapsed", placeholder="在此输入你的分析或批示，按回车也可提交...")
                 with c2:
-                    current_assignee = card.get('assignee', '未分配')
-                    team_members = ["未分配", "张三", "李四", "王五"]
-                    new_assignee = st.selectbox("分配组员", team_members, index=team_members.index(current_assignee), key=f"assign_{card['id']}", label_visibility="collapsed")
-                    if new_assignee != current_assignee:
-                        supabase.table("intelligence_db").update({"assignee": new_assignee}).eq("id", card['id']).execute()
-                        st.rerun()
+                    if st.button("💬 提交批示", key=f"btn_comment_{card['id']}", use_container_width=True):
+                        if comment_text:
+                            # 将留言和当前登录人的名字一起写入数据库
+                            supabase.table("comments_db").insert({
+                                "report_id": card['id'],
+                                "agent_name": st.session_state.current_user,
+                                "content": comment_text
+                            }).execute()
+                            st.rerun() # 瞬间刷新，留言立刻上墙！
                 with c3:
-                    st.write(f"🏷️ 追踪状态：`{current_status}`")
+                    if st.button("🔍 深度挖掘", key=f"btn_deep_{card['id']}", use_container_width=True, type="secondary"):
+                        st.info("🚧 长官，AI 深度挖掘与扩写功能正在接入中，敬请期待！")
 else:
     st.info("👈 报告长官，数据库目前为空。请在侧边栏点击启动按钮，执行第一次入库作业！")
