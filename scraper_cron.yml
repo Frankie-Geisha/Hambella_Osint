@@ -1,0 +1,30 @@
+name: 🌸 花魁暗哨 (2小时定时抓取)
+
+on:
+  schedule:
+    # 这里的 cron 表达式意思是：每隔 2 小时运行一次
+    - cron: '0 */2 * * *'
+  # workflow_dispatch 允许你在 GitHub 网页上手动点击运行测试！
+  workflow_dispatch:
+
+jobs:
+  run-scraper:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 检出最新代码
+        uses: actions/checkout@v4
+      
+      - name: ⚙️ 设置 Python 环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          
+      - name: 📦 安装军火库依赖
+        run: pip install -r requirements.txt
+        
+      - name: 🚀 启动幽灵抓取脚本
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: python auto_scraper.py
