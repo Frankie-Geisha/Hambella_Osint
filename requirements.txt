@@ -3,5 +3,5 @@ requests
 beautifulsoup4
 openai
 supabase
-google-generativeai>=0.8.0  # 🌟 呼叫 Gemini 的专用卫星电话
-python-docx          # 🌟 生成 Word 文档的工业车床
+google-genai
+python-docx
