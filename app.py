@@ -506,7 +506,7 @@ elif st.session_state.page == "deep_dive":
                 
                 client_claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
                 response = client_claude.messages.create(
-                    model="claude-3-5-sonnet-20241022", # 或者最新的 claude-3-5-sonnet-latest
+                    model="claude-sonnet-4-6", # 或者最新的 claude-3-5-sonnet-latest
                     max_tokens=4096,
                     system=claude_system_prompt,
                     messages=[{"role": "user", "content": claude_user_message}]
