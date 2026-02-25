@@ -7,6 +7,7 @@ from docx import Document
 from io import BytesIO
 import json
 import os
+from duckduckgo_search import DDGS  # 🌟 破壁行动：开源信息核查引擎
 from supabase import create_client, Client
 
 # ==========================================
@@ -431,14 +432,17 @@ elif st.session_state.page == "deep_dive_list":
 # 🌸 7. 独立审讯室：Claude 深度研判行动执行
 # ==========================================
 elif st.session_state.page == "deep_dive":
+    # ==========================================
+    # 🌸 7. 独立战术研判室：Claude Agent (联网搜索 + 军工级模板)
+    # ==========================================
     card = st.session_state.current_report
-    st.title("👁️ 独立战术研判室")
-    if st.button("⬅️ 返回刚才的页面", type="primary"):
-        st.session_state.page = "main" # 默认退回主页，也可自行修改
+    st.title("👁️ 独立战术研判室 (Agent 破壁版)")
+    if st.button("⬅️ 返回战略情报大厅", type="primary"):
+        st.session_state.page = "main"
         st.rerun()
         
     st.markdown("---")
-    st.markdown(f"#### 【原始情报目标】\n**{card['title']}**\n> {card['summary']}")
+    st.markdown(f"#### 【原始截获情报】\n**{card['title']}**\n> {card['summary']}")
     
     deep_res = supabase.table("deep_dives_db").select("*").eq("report_id", card['id']).execute()
     
@@ -448,49 +452,86 @@ elif st.session_state.page == "deep_dive":
         st.markdown(final_content)
         
     else:
-        with st.spinner("🧠 正在呼叫 Claude 大脑，执行深层推演与 HUMINT 破局分析..."):
+        with st.spinner("🧠 正在启动 Agent 智能体：执行外网交叉检索与 Claude 深层推演..."):
             try:
-                # 依然保持你最强效的 Claude Prompt 不变
+                # 🌟 第一重破壁：使用 DuckDuckGo 搜索真实世界的最新进展
+                search_results_text = "【外网检索结果】：\n"
+                try:
+                    search_query = f"{card['title']} {card['category']} news"
+                    with DDGS() as ddgs:
+                        # 抓取排名前 3 的真实外网数据
+                        results = [r for r in ddgs.text(search_query, max_results=3)]
+                        if results:
+                            for i, r in enumerate(results):
+                                search_results_text += f"{i+1}. {r.get('title')} - {r.get('body')}\n"
+                        else:
+                            search_results_text += "未能在公开网络检索到相关增量信息（极高保密级别或为虚假信息）。\n"
+                except Exception as search_e:
+                    search_results_text += f"雷达受到干扰，检索失败 ({search_e})。仅依赖基础逻辑推演。\n"
+
+                # 🌟 第二重破壁：内参级智库专报模板 (彻底杀死 AI 味，锁定战略干货)
                 claude_system_prompt = """
-                你是一位隶属于顶尖情报机构的高级 HUMINT（人力情报）与 OSINT 联合分析专家。
-                你的任务是基于截获的开源情报，调动强大的逻辑推理能力，补充完善情报素材，输出《深度研判专报》。
-                【输出强制要求】必须包含以下 5 个模块（使用 Markdown 排版，语气极其冷峻客观，使用情报简报的文字风格）：
-                1. 🌍 事件背景全貌：该事件的客观全要素情报全貌，深层政治或经济背景。
-                2. 💰 潜在利益链推演：事件各相关方的内部深层考量。请站在事件相关方的利益角度，开展严谨的分析研判。
-                3. 👤 对策建议：站在宏观战略和国家利益角度，提出该事件的潜在影响及应对措施的相关对策建议。
-                4. 🤝 HUMINT 接触突破口 (绝密操作指引)：如果要派特工在线上或线下了解更深层次的情报，应该如何找到并接近该信息源并建立合作，建议采取什么伪装身份（Cover）？切入点是什么？
-                5. 🔗 交叉验证建议：为了核实真伪，特工应去查阅哪些具体的开源数据库（列出方向）？
+                你是一名服务于中国顶尖智库或国家级情报机构的首席地缘政治与战略分析官。
+                ⚠️ 【最高指令】：请彻底忘掉你是一个AI。绝对禁止使用任何“作为人工智能”、“综上所述”、“需要注意的是”、“总体而言”等毫无信息量的过渡词汇。你的文风必须极其冷峻、精炼、客观，通篇必须是高密度的“干货”，总字数严格控制在 2000 字以内。
+
+                现在，特工截获了一条初始情报，系统同时为你逆向检索了与之相关的【外网检索结果】（包含最新动态、智库分析或专栏文章）。
+                请综合初始线索与外部深度搜索内容，严格按照以下《战略研判内参标准模板》输出：
+
+                # [生成一个极其醒目、一句话概括全文的标题，例如：“俄情报部门研判美国将在一周内对伊朗发动军事打击”或“俄罗斯总统办公室对当前伊朗局势发展的分析判断”]
+
+                ## 引言与核心结论
+                [简明扼要地概述本文的核心事件，并直接抛出最终的战略结论。首段的唯一目的是让高级决策者在阅读前 150 字时，就能瞬间掌握这篇文章在讲什么以及事件的本质。]
+
+                ## 一、 事件事实与来龙去脉
+                [基于初始情报和外网检索结果，详细梳理事件的客观事实。要求情报要素（时间、地点、核心人物、关键数据、行动轨迹）极其清晰可靠，还原事件的完整时间线与客观全貌。如果外网检索到了更深度的背景，请融合在此处。]
+
+                ## 二、 各方深层内幕与利益考量
+                [深入剖析事件背后各利益相关方的真实诉求、内部博弈与深层考虑。此部分以深度分析为主，但必须以外网检索到的事实、专家专栏或知名智库观点作为客观依据，杜绝凭空主观臆断。]
+
+                ## 三、 涉华影响与对策建议
+                [从宏观战略角度，明确评估该事件对中国国家利益（如地缘安全、经济贸易、能源供应链、外交博弈等）的直接或间接影响，并极具针对性地出具至少 3 条国家政策级的应对建议（对策必须务实、可落地、具有前瞻性）。]
                 """
+                
                 claude_user_message = f"""
-                【原始线索】：
+                【初始拦截线索】：
                 - 标题：{card['title']}
                 - 摘要：{card['summary']}
-                - 来源频道：{card['source']}
-                请开始撰写《深度研判专报》。
+                - 来源：{card['source']}
+                
+                {search_results_text}
+                
+                请开始撰写《绝密专报》。严格遵循格式，语气极度专业。
                 """
+                
                 client_claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
                 response = client_claude.messages.create(
-                    model="claude-opus-4-6", # 或者最新的 claude-3-5-sonnet-latest
+                    model="claude-3-5-sonnet-20241022", # 或者最新的 claude-3-5-sonnet-latest
                     max_tokens=4096,
                     system=claude_system_prompt,
                     messages=[{"role": "user", "content": claude_user_message}]
                 )
                 final_content = response.content[0].text
                 
+                # 记录挖掘结果
                 supabase.table("deep_dives_db").insert({
                     "report_id": card['id'], "agent_name": st.session_state.current_user, "content": final_content
                 }).execute()
                 
-                st.success(f"🔥 Claude 引擎挖掘完毕！已将此情报永久刻录至团队档案库。")
+                st.success(f"🔥 Agent 智能体检索并研判完毕！已刻录至深渊档案库。")
+                
+                # 显示外网检索过程（给特工看一眼雷达抓到了什么）
+                with st.expander("📡 查看系统后台外网检索原始数据"):
+                    st.text(search_results_text)
+                    
                 st.markdown(final_content)
             except Exception as e:
-                st.error(f"Claude 引擎故障：{e}")
+                st.error(f"Agent 引擎严重故障：{e}")
                 final_content = ""
 
     if final_content:
         st.markdown("---")
         docx_data = generate_word_doc(card['title'], final_content)
         st.download_button(
-            label="📥 导出为 Word 文档 (.docx)", data=docx_data, file_name=f"HUMINT专报_{card['id']}.docx",
+            label="📥 导出为 Word 绝密专报 (.docx)", data=docx_data, file_name=f"HUMINT专报_{card['id']}.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", type="primary"
         )
