@@ -69,33 +69,59 @@ def run_auto_scrape():
                 last_read_id = bookmarks.get(channel_name, 0)
                 highest_id = last_read_id
                 
-                response = requests.get(url, headers=headers)
-                soup = BeautifulSoup(response.text, 'html.parser')
-                message_blocks = soup.find_all('div', class_='tgme_widget_message')
-                
-                # 🌟 战术升级 2：解除新兵限制，首次抓取扩大到 20 条
-                if last_read_id == 0: message_blocks = message_blocks[-20:] 
-                    
                 channel_new_text = ""
-                for block in message_blocks:
-                    post_id_str = block.get('data-post')
-                    text_div = block.find('div', class_='tgme_widget_message_text')
-                    time_tag = block.find('time')
-                    msg_time = time_tag.get('datetime', '')[:16].replace('T', ' ') if time_tag else "未知时间"
-                    
-                    if post_id_str and text_div:
-                        msg_id = int(post_id_str.split('/')[-1])
-                        if msg_id > last_read_id:
-                            channel_new_text += f"[发帖时间: {msg_time}] " + text_div.text + "\n"
-                            new_msg_count += 1
-                            if msg_id > highest_id: highest_id = msg_id
+                current_url = url
+                pages_fetched = 0
                 
+                # 🌟 V5.2 时光倒流引擎：最多往前翻阅 5 页（约 100 条历史消息），防止死循环
+                while pages_fetched < 5:
+                    response = requests.get(current_url, headers=headers)
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    message_blocks = soup.find_all('div', class_='tgme_widget_message')
+                    
+                    if not message_blocks: break
+                    
+                    # 第一次收录该频道时，限制抓取最新 20 条，不翻页
+                    if last_read_id == 0 and pages_fetched == 0: 
+                        message_blocks = message_blocks[-20:] 
+                        
+                    page_has_new_msg = False
+                    oldest_msg_id_on_page = 999999999
+                    page_text = ""
+                    
+                    for block in message_blocks:
+                        post_id_str = block.get('data-post')
+                        text_div = block.find('div', class_='tgme_widget_message_text')
+                        time_tag = block.find('time')
+                        msg_time = time_tag.get('datetime', '')[:16].replace('T', ' ') if time_tag else "未知时间"
+                        
+                        if post_id_str and text_div:
+                            msg_id = int(post_id_str.split('/')[-1])
+                            if msg_id < oldest_msg_id_on_page: 
+                                oldest_msg_id_on_page = msg_id
+                            
+                            if msg_id > last_read_id:
+                                page_text += f"[发帖时间: {msg_time}] " + text_div.text + "\n"
+                                new_msg_count += 1
+                                page_has_new_msg = True
+                                if msg_id > highest_id: highest_id = msg_id
+                    
+                    # 巧妙拼接：把旧网页捞出来的信息，垫在前面，保证最终 AI 阅读的时间线是顺畅的！
+                    channel_new_text = page_text + channel_new_text
+                    
+                    # 💡 核心机关：如果这一页最老的消息依然比书签新，且这不是个新频道，触发翻页！
+                    if oldest_msg_id_on_page > last_read_id and page_has_new_msg and last_read_id != 0:
+                        current_url = f"{url}?before={oldest_msg_id_on_page}"
+                        pages_fetched += 1
+                    else:
+                        break # 无缝衔接成功，退出翻页循环
+                        
                 if channel_new_text != "":
                     is_vip = "【🔴 VIP 必须提炼】" if channel_name in VIP_CHANNELS else ""
                     raw_intelligence += f"\n\n--- 来源：{channel_name} {is_vip} ---\n" + channel_new_text
                     bookmarks[channel_name] = highest_id
             except Exception as e: 
-                print(f"⚠️ 频道 {channel_name} 抓取失败: {e}")
+                print(f"⚠️ 频道 {url} 抓取异常: {e}")
                 
         # 存下书签
         save_bookmarks(bookmarks)
