@@ -134,28 +134,49 @@ if st.session_state.page == "main":
                         last_read_id = bookmarks.get(channel_name, 0)
                         highest_id = last_read_id
                         
-                        response = requests.get(url, headers=headers)
-                        soup = BeautifulSoup(response.text, 'html.parser')
-                        message_blocks = soup.find_all('div', class_='tgme_widget_message')
-                        if last_read_id == 0: message_blocks = message_blocks[-5:] 
-                            
                         channel_new_text = ""
-                        for block in message_blocks:
-                            post_id_str = block.get('data-post')
-                            text_div = block.find('div', class_='tgme_widget_message_text')
-                            
-                            # 🌟 新增：提取真实发布时间
-                            time_tag = block.find('time')
-                            msg_time = time_tag.get('datetime', '')[:16].replace('T', ' ') if time_tag else "未知时间"
-                            
-                            if post_id_str and text_div:
-                                msg_id = int(post_id_str.split('/')[-1])
-                                if msg_id > last_read_id:
-                                    # 把真实时间喂给 AI
-                                    channel_new_text += f"[发帖时间: {msg_time}] " + text_div.text + "\n"
-                                    new_msg_count += 1
-                                    if msg_id > highest_id: highest_id = msg_id
+                        current_url = url
+                        pages_fetched = 0
                         
+                        while pages_fetched < 5:
+                            response = requests.get(current_url, headers=headers)
+                            soup = BeautifulSoup(response.text, 'html.parser')
+                            message_blocks = soup.find_all('div', class_='tgme_widget_message')
+                            
+                            if not message_blocks: break
+                            
+                            if last_read_id == 0 and pages_fetched == 0: 
+                                message_blocks = message_blocks[-20:] 
+                                
+                            page_has_new_msg = False
+                            oldest_msg_id_on_page = 999999999
+                            page_text = ""
+                            
+                            for block in message_blocks:
+                                post_id_str = block.get('data-post')
+                                text_div = block.find('div', class_='tgme_widget_message_text')
+                                time_tag = block.find('time')
+                                msg_time = time_tag.get('datetime', '')[:16].replace('T', ' ') if time_tag else "未知时间"
+                                
+                                if post_id_str and text_div:
+                                    msg_id = int(post_id_str.split('/')[-1])
+                                    if msg_id < oldest_msg_id_on_page: 
+                                        oldest_msg_id_on_page = msg_id
+                                    
+                                    if msg_id > last_read_id:
+                                        page_text += f"[发帖时间: {msg_time}] " + text_div.text + "\n"
+                                        new_msg_count += 1
+                                        page_has_new_msg = True
+                                        if msg_id > highest_id: highest_id = msg_id
+                            
+                            channel_new_text = page_text + channel_new_text
+                            
+                            if oldest_msg_id_on_page > last_read_id and page_has_new_msg and last_read_id != 0:
+                                current_url = f"{url}?before={oldest_msg_id_on_page}"
+                                pages_fetched += 1
+                            else:
+                                break
+                                
                         if channel_new_text != "":
                             is_vip = "【🔴 VIP 必须提炼】" if channel_name in VIP_CHANNELS else ""
                             raw_intelligence += f"\n\n--- 来源：{channel_name} {is_vip} ---\n" + channel_new_text
@@ -174,7 +195,8 @@ if st.session_state.page == "main":
                     ⚠️ 极其重要指令 1：原始文本中带有 [发帖时间: ...]。如果有多个来源讲述同一件事，请提取出其中最早的那个时间，格式为 YYYY-MM-DD HH:MM。
                     ⚠️ 极其重要指令 2：如果该条信息的来源带有 "【🔴 VIP 必须提炼】" 的标记，请在输出的 "summary" 字段最后，追加 "【💎 VIP 原文全译】：" 及完整的中文翻译。
                     ⚠️ 极其重要指令 3（防崩溃最高纪律）：你输出的必须是严格合法的 JSON！JSON 字符串内部的换行必须严格使用 "\\n" 代替，绝对不能直接物理换行！双引号必须用 "\\" 转义！
-                    
+                    ⚠️ 极其重要指令 4：请务必“宁滥勿缺”！只要包含具体事件、观点、动向，即便你认为价值不高，也要提取出来（可以打低分），绝不能随意丢弃原始信息！
+
                     【🎯 核心战术打分量表 (score: 0-100)】：
                     - 90-100分 (极高危/战略级)：将改变地缘格局、重大高层清洗/人事突变、涉华重大负面/核心利益链异动、核潜艇/战略武器调动。
                     - 70-89分 (高价值线索)：中等规模突发冲突、关键供应链/能源网异动。
