@@ -25,6 +25,9 @@ if "page" not in st.session_state:
     st.session_state.page = "main"
 if "current_report" not in st.session_state:
     st.session_state.current_report = None
+# 🌟 V5.0 新增：用于记录在“专注模式”下，特工当前正在批阅第几张卡片
+if "focus_index" not in st.session_state:
+    st.session_state.focus_index = 0
 
 if not st.session_state.authenticated:
     st.title("🔒 绝密区域：Agent身份核验")
@@ -165,12 +168,21 @@ if st.session_state.page == "main":
                     client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com")
                     system_prompt = """
                     你是一位顶级的地缘政治与 OSINT 分析官。
-                    请分析原始消息，浓缩成独立情报（VIP必提炼），必须彻底翻译为简体中文！
-                    ⚠️ 极其重要：原始文本中带有 [发帖时间: ...]。如果有多个来源讲述同一件事，请提取出其中最早的那个时间，格式为 YYYY-MM-DD HH:MM。
+                    请分析原始消息，浓缩成独立情报，必须彻底翻译为简体中文！
+                    
+                    ⚠️ 极其重要指令 1：原始文本中带有 [发帖时间: ...]。如果有多个来源讲述同一件事，请提取出其中最早的那个时间，格式为 YYYY-MM-DD HH:MM。
+                    ⚠️ 极其重要指令 2：如果该条信息的来源带有 "【🔴 VIP 必须提炼】" 的标记，你必须在输出的 "summary" 字段的最后，换行加上 "【💎 VIP 原文全译】："，并附上该条消息一字不落的、完整的中文翻译！如果是普通来源，则不需要附带全文。
+                    
+                    【🎯 核心战术打分量表 (score: 0-100)】：
+                    - 90-100分 (极高危/战略级)：将改变地缘格局、重大高层清洗/人事突变、涉华重大负面/核心利益链异动、核潜艇/战略武器调动。
+                    - 70-89分 (高价值线索)：中等规模突发冲突、关键供应链/能源网异动、暴露出值得特工后续追踪的 HUMINT 切入点。
+                    - 40-69分 (一般情报)：常规战况播报、例行外交辞令、宏观经济数据的一般波动。
+                    - 0-39分 (信息噪点)：无意义的政治宣传、未经证实的边缘八卦、日常琐事。（请尽量将此类信息剔除，不要输出）。
+                    
                     【输出合法 JSON】：
                     {
                         "reports": [
-                            {"title": "中文标题", "summary": "中文概述", "category": "China Nexus 等代号", "score": 85, "source": "频道", "publish_time": "最早发布时间(YYYY-MM-DD HH:MM)"}
+                            {"title": "中文标题", "summary": "中文概述（若为VIP则追加全文翻译）", "category": "China Nexus 等代号", "score": 85, "source": "频道", "publish_time": "最早发布时间(YYYY-MM-DD HH:MM)"}
                         ]
                     }
                     """
@@ -189,6 +201,11 @@ if st.session_state.page == "main":
             except Exception as e: st.error(f"故障：{e}")
 
     st.title("🌸 OSINT 指挥大厅 (实时截获)")
+    
+    # 🌟 V5.0 核心大招：UI 模式无缝切换开关
+    ui_mode = st.radio("👁️ 战术视觉模式切换：", ["初始模式 (经典列表)", "信息瀑布模式 (全局视野)", "专注模式 (沉浸审批)"], horizontal=True)
+    st.markdown("---")
+    
     try:
         db_response = supabase.table("intelligence_db").select("*").order("id", desc=True).execute()
         db_cards = db_response.data
@@ -196,44 +213,137 @@ if st.session_state.page == "main":
 
     if len(db_cards) > 0:
         filtered_cards = [c for c in db_cards if (filter_category == "全部领域" or c.get('category') == filter_category) and c.get('score', 0) >= filter_score]
-        for card in filtered_cards:
-            score = card.get('score', 0)
-            border_color = "🔴" if score >= 80 else "🟡" if score >= 60 else "🔵"
-            with st.container(border=True):
-                st.markdown(f"### {border_color} [{score}分] {card.get('category')} | {card.get('title')}")
+        
+        if len(filtered_cards) == 0:
+            st.info("💡 当前筛选条件下无匹配情报。")
+        else:
+            # ==========================================
+            # 模式 1：初始模式 (经典单列列表，原汁原味)
+            # ==========================================
+            if ui_mode == "初始模式 (经典列表)":
+                for card in filtered_cards:
+                    score = card.get('score', 0)
+                    border_color = "🔴" if score >= 80 else "🟡" if score >= 60 else "🔵"
+                    with st.container(border=True):
+                        st.markdown(f"### {border_color} [{score}分] {card.get('category')} | {card.get('title')}")
+                        st.caption(f"📡 来源：{card.get('source')} | 🕰️ 真实发布时间：**{card.get('publish_time', '未获取')}**")
+                        st.write(card.get('summary'))
+                        
+                        comments_res = supabase.table("comments_db").select("*").eq("report_id", card['id']).order("created_at").execute()
+                        if len(comments_res.data) > 0:
+                            st.markdown("---")
+                            for c in comments_res.data:
+                                st.markdown(f"**🕵️ {c['agent_name']}** : {c['content']}")
+                        st.markdown("---")
+                        
+                        c1, c2, c3, c4 = st.columns([2, 1, 1, 1])
+                        with c1:
+                            comment_text = st.text_input("📝 批示...", key=f"in_{card['id']}", label_visibility="collapsed")
+                        with c2:
+                            if st.button("💬 提交批示", key=f"btn_c_{card['id']}", use_container_width=True) and comment_text:
+                                supabase.table("comments_db").insert({"report_id": card['id'], "agent_name": st.session_state.current_user, "content": comment_text}).execute()
+                                st.rerun()
+                        with c3:
+                            if st.button("🔍 深度挖掘", key=f"btn_d_{card['id']}", use_container_width=True, type="secondary"):
+                                st.session_state.current_report = card
+                                st.session_state.page = "deep_dive" 
+                                st.rerun()
+                        with c4:
+                            if st.button("⭐ 归档入库", key=f"btn_arc_{card['id']}", use_container_width=True):
+                                try:
+                                    supabase.table("archives_db").insert({"report_id": card['id'], "agent_name": st.session_state.current_user}).execute()
+                                    st.toast("✅ 成功存入您的私人归档库！")
+                                except:
+                                    st.toast("⚠️ 这条情报您之前已经归档过了！")
+            
+            # ==========================================
+            # 模式 2：信息瀑布模式 (三列高低错落排布)
+            # ==========================================
+            elif ui_mode == "信息瀑布模式 (全局视野)":
+                cols = st.columns(3) # 创建 3 列
+                for i, card in enumerate(filtered_cards):
+                    col = cols[i % 3] # 轮流把卡片塞进 3 列里
+                    with col.container(border=True):
+                        score = card.get('score', 0)
+                        border_color = "🔴" if score >= 80 else "🟡" if score >= 60 else "🔵"
+                        
+                        st.markdown(f"#### {border_color} [{score}分] {card.get('category')}")
+                        st.markdown(f"**{card.get('title')}**")
+                        st.caption(f"📡 {card.get('source')} | 🕰️ {card.get('publish_time', '未知')}")
+                        
+                        with st.expander("展开核心摘要与原文"):
+                            st.write(card.get('summary'))
+                        
+                        c_left, c_right = st.columns(2)
+                        with c_left:
+                            if st.button("🔍 研判", key=f"wf_d_{card['id']}", use_container_width=True):
+                                st.session_state.current_report = card
+                                st.session_state.page = "deep_dive" 
+                                st.rerun()
+                        with c_right:
+                            if st.button("⭐ 归档", key=f"wf_arc_{card['id']}", use_container_width=True):
+                                try:
+                                    supabase.table("archives_db").insert({"report_id": card['id'], "agent_name": st.session_state.current_user}).execute()
+                                    st.toast("✅ 存入私人归档库！")
+                                except: st.toast("⚠️ 已归档过！")
+
+            # ==========================================
+            # 模式 3：专注模式 (单卡片沉浸审批)
+            # ==========================================
+            elif ui_mode == "专注模式 (沉浸审批)":
+                if st.session_state.focus_index >= len(filtered_cards):
+                    st.session_state.focus_index = 0
                 
-                # 🌟 显示真实的源头发布时间！
-                st.caption(f"📡 来源：{card.get('source')} | 🕰️ 真实发布时间：**{card.get('publish_time', '未获取')}**")
-                st.write(card.get('summary'))
+                card = filtered_cards[st.session_state.focus_index]
+                score = card.get('score', 0)
+                border_color = "🔴" if score >= 80 else "🟡" if score >= 60 else "🔵"
                 
-                comments_res = supabase.table("comments_db").select("*").eq("report_id", card['id']).order("created_at").execute()
-                if len(comments_res.data) > 0:
+                spacer1, center_col, spacer2 = st.columns([1, 2, 1]) # 使用空列挤压，让卡片居中独占
+                
+                with center_col.container(border=True):
+                    st.markdown(f"## {border_color} [{score}分] {card.get('category')}")
+                    st.markdown(f"### {card.get('title')}")
+                    st.caption(f"📡 来源：{card.get('source')} | 🕰️ 真实发布时间：**{card.get('publish_time', '未获取')}**")
                     st.markdown("---")
-                    for c in comments_res.data:
-                        st.markdown(f"**🕵️ {c['agent_name']}** : {c['content']}")
-                st.markdown("---")
-                
-                # 🌟 新增四个并排的操作区
-                c1, c2, c3, c4 = st.columns([2, 1, 1, 1])
-                with c1:
-                    comment_text = st.text_input("📝 批示...", key=f"in_{card['id']}", label_visibility="collapsed")
-                with c2:
-                    if st.button("💬 提交批示", key=f"btn_c_{card['id']}", use_container_width=True) and comment_text:
+                    st.write(card.get('summary'))
+                    st.markdown("---")
+                    
+                    comments_res = supabase.table("comments_db").select("*").eq("report_id", card['id']).order("created_at").execute()
+                    if len(comments_res.data) > 0:
+                        st.caption("💬 **战术批示区：**")
+                        for c in comments_res.data:
+                            st.markdown(f"**🕵️ {c['agent_name']}** : {c['content']}")
+                        st.markdown("---")
+                    
+                    comment_text = st.text_input("📝 添加批示...", key=f"foc_in_{card['id']}", label_visibility="collapsed")
+                    if st.button("💬 提交批示并留在本页", key=f"foc_btn_c_{card['id']}", use_container_width=True) and comment_text:
                         supabase.table("comments_db").insert({"report_id": card['id'], "agent_name": st.session_state.current_user, "content": comment_text}).execute()
                         st.rerun()
-                with c3:
-                    if st.button("🔍 深度挖掘", key=f"btn_d_{card['id']}", use_container_width=True, type="secondary"):
+                    
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    
+                    t1, t2 = st.columns(2)
+                    with t1:
+                        if st.button("❌ 忽略 / 划走", key=f"foc_pass_{card['id']}", use_container_width=True, type="secondary"):
+                            st.session_state.focus_index += 1
+                            st.rerun()
+                    with t2:
+                        if st.button("⭐ 归档入库", key=f"foc_arc_{card['id']}", use_container_width=True, type="primary"):
+                            try:
+                                supabase.table("archives_db").insert({"report_id": card['id'], "agent_name": st.session_state.current_user}).execute()
+                                st.toast("✅ 归档成功！")
+                            except: pass
+                            st.session_state.focus_index += 1
+                            st.rerun()
+                            
+                    if st.button("🔍 呼叫 Claude 启动深渊研判", key=f"foc_d_{card['id']}", use_container_width=True):
                         st.session_state.current_report = card
                         st.session_state.page = "deep_dive" 
                         st.rerun()
-                with c4:
-                    # 🌟 核心功能：个人归档按钮
-                    if st.button("⭐ 归档入库", key=f"btn_arc_{card['id']}", use_container_width=True):
-                        try:
-                            supabase.table("archives_db").insert({"report_id": card['id'], "agent_name": st.session_state.current_user}).execute()
-                            st.toast("✅ 成功存入您的私人归档库！")
-                        except:
-                            st.toast("⚠️ 这条情报您之前已经归档过了！")
+                        
+                st.markdown(f"<p style='text-align: center; color: gray;'>👉 审批进度：( {st.session_state.focus_index + 1} / {len(filtered_cards)} )</p>", unsafe_allow_html=True)
+    else:
+        st.info("👈 报告长官，数据库目前为空。请启动侦察！")
 
 # ==========================================
 # 🌸 5. 页面 2：个人与团队情报归档库
