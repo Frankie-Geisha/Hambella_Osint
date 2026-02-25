@@ -1,5 +1,7 @@
 streamlit
 requests
 beautifulsoup4
-supabase
 openai
+supabase
+google-generativeai  # 🌟 呼叫 Gemini 的专用卫星电话
+python-docx          # 🌟 生成 Word 文档的工业车床
