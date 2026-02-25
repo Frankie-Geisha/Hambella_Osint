@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 from openai import OpenAI
-import google.generativeai as genai
+from google import genai # 🌟 全新换血的官方 SDK
 from docx import Document
 from io import BytesIO
 import json
@@ -18,14 +18,13 @@ SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 路由与状态管理
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
     st.session_state.current_user = ""
 if "page" not in st.session_state:
-    st.session_state.page = "main" # 默认停留在主屏幕
+    st.session_state.page = "main"
 if "current_report" not in st.session_state:
-    st.session_state.current_report = None # 记录当前正在被挖掘的情报
+    st.session_state.current_report = None
 
 if not st.session_state.authenticated:
     st.title("🔒 绝密区域：Agent身份核验")
@@ -49,7 +48,6 @@ if not st.session_state.authenticated:
 # ==========================================
 DEEPSEEK_API_KEY = st.secrets["DEEPSEEK_API_KEY"]
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-genai.configure(api_key=GEMINI_API_KEY) # 初始化 Gemini 引擎
 
 channel_urls = [
     "https://t.me/s/ejdailyru","https://t.me/s/Ateobreaking", "https://t.me/s/theinsider", "https://t.me/s/moscowtimes_ru",
@@ -88,9 +86,7 @@ def generate_word_doc(title, content):
 # ==========================================
 # 🌸 3. 页面分支：主大厅 (Main) vs 独立审讯室 (Deep Dive)
 # ==========================================
-
 if st.session_state.page == "main":
-    # ---------------- 战术侧边栏 ----------------
     with st.sidebar:
         st.title("⚙️ 战术控制台")
         st.success(f"🟢 在线Agent: **{st.session_state.current_user}**")
@@ -100,9 +96,8 @@ if st.session_state.page == "main":
         filter_category = st.selectbox("领域锁定：", ["全部领域", "China Nexus", "Espionage", "Kremlin Core", "RU Local Event", "Global Macro"])
         filter_score = st.slider("最低威胁分阀值：", 0, 100, 0)
         st.markdown("---")
-        st.caption("🌸 花魁 OSINT v4.0 | 双引擎架构")
+        st.caption("🌸 花魁 OSINT v4.0 | 3.1 Pro 超大杯架构")
 
-    # ---------------- 抓取与 DeepSeek 分析 ----------------
     if run_btn:
         with st.spinner('调用 DeepSeek 引擎执行广度侦察与翻译...'):
             try:
@@ -147,43 +142,23 @@ if st.session_state.page == "main":
                     system_prompt = """
                     你是一位顶级的地缘政治与开源情报（OSINT）首席分析官。
                     请分析我提供的多频道原始消息（包含大量俄语、英语等外文生肉）。
-                    
                     【你的核心任务】：
                     1. 剔除广告、无意义闲聊。将有价值的信息浓缩成独立的情报。
                     2. 针对标有“【🔴 VIP 必须提炼】”的内容，务必单独生成情报，绝不能遗漏。
                     3. ⚠️ 极其重要（最高指令）：无论原文是什么语言，你最终输出的标题和内容都必须彻底翻译为**专业、严谨的简体中文**！绝对不允许在输出的 JSON 内容中出现未翻译的外文生肉！
-                    
                     【数量限制】：严格挑选出最具战略价值的前 10 到 15 条情报。
-                    
-                    【情报分类代号】：
-                    - China Nexus
-                    - Espionage
-                    - Kremlin Core
-                    - RU Local Event
-                    - Global Macro
-                    
+                    【情报分类代号】：China Nexus / Espionage / Kremlin Core / RU Local Event / Global Macro
                     【打分标准】：评估“战略影响指数”(0-100分)。
-                    
                     【输出格式要求】：必须且只能输出合法的 JSON 格式：
                     {
                         "reports": [
-                            {
-                                "title": "一句话精炼的中文标题",
-                                "summary": "情报核心内容的详细中文概述（条理清晰，翻译信达雅）",
-                                "category": "上述英文代号之一",
-                                "score": 85,
-                                "source": "频道名称"
-                            }
+                            {"title": "一句话精炼的中文标题", "summary": "情报核心内容的详细中文概述", "category": "上述英文代号之一", "score": 85, "source": "频道名称"}
                         ]
                     }
                     """
-                    
-                    # 修复了这里的缩进对齐问题
                     ai_response = client.chat.completions.create(
-                        model="deepseek-chat", 
-                        messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": raw_intelligence}],
-                        response_format={"type": "json_object"}, 
-                        max_tokens=4000
+                        model="deepseek-chat", messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": raw_intelligence}],
+                        response_format={"type": "json_object"}, max_tokens=4000
                     )
                     reports = json.loads(ai_response.choices[0].message.content).get("reports", [])
                     for rep in reports:
@@ -194,7 +169,6 @@ if st.session_state.page == "main":
                     st.sidebar.success(f"✅ 截获 {len(reports)} 条中文情报！")
             except Exception as e: st.error(f"故障：{e}")
 
-    # ---------------- 实时情报卡片流 ----------------
     st.title("🌸 OSINT指挥大厅")
     try:
         db_response = supabase.table("intelligence_db").select("*").order("id", desc=True).execute()
@@ -203,17 +177,14 @@ if st.session_state.page == "main":
 
     if len(db_cards) > 0:
         filtered_cards = [c for c in db_cards if (filter_category == "全部领域" or c.get('category') == filter_category) and c.get('score', 0) >= filter_score]
-        
         for card in filtered_cards:
             score = card.get('score', 0)
             border_color = "🔴" if score >= 80 else "🟡" if score >= 60 else "🔵"
-                
             with st.container(border=True):
                 st.markdown(f"### {border_color} [{score}分] {card.get('category')} | {card.get('title')}")
                 st.caption(f"📡 来源：{card.get('source')} | 🕵️ 录入：{card.get('created_at', '')[:10]}")
                 st.write(card.get('summary'))
                 
-                # 留言展示区
                 comments_res = supabase.table("comments_db").select("*").eq("report_id", card['id']).order("created_at").execute()
                 if len(comments_res.data) > 0:
                     st.markdown("---")
@@ -221,7 +192,6 @@ if st.session_state.page == "main":
                         st.markdown(f"**🕵️ {c['agent_name']}** : {c['content']}")
                 st.markdown("---")
                 
-                # 交互按钮区
                 c1, c2, c3 = st.columns([2, 1, 1])
                 with c1:
                     comment_text = st.text_input("📝 添加批示...", key=f"in_{card['id']}", label_visibility="collapsed")
@@ -237,10 +207,9 @@ if st.session_state.page == "main":
 
 elif st.session_state.page == "deep_dive":
     # ==========================================
-    # 🌸 4. 独立审讯室：Gemini Pro 深度挖掘档案库
+    # 🌸 4. 独立审讯室：Gemini 3.1 Pro 深度挖掘档案库
     # ==========================================
     card = st.session_state.current_report
-    
     st.title("👁️ 深渊凝视：独立战术研判室")
     if st.button("⬅️ 返回战略情报大厅", type="primary"):
         st.session_state.page = "main"
@@ -249,21 +218,19 @@ elif st.session_state.page == "deep_dive":
     st.markdown("---")
     st.markdown(f"#### 【原始情报目标】\n**{card['title']}**\n> {card['summary']}")
     
-    # 🌟 核心防败家机制：先查云端档案柜！
     deep_res = supabase.table("deep_dives_db").select("*").eq("report_id", card['id']).execute()
     
     if len(deep_res.data) > 0:
-        st.success(f"💾 历史档案调取成功！本报告由特工 **{deep_res.data[0]['agent_name']}** 耗费 AI 算力挖掘，现为您免费呈现。")
+        st.success(f"💾 历史档案调取成功！本报告由Agent **{deep_res.data[0]['agent_name']}** 耗费 AI 算力挖掘，现为您免费呈现。")
         final_content = deep_res.data[0]['content']
         st.markdown(final_content)
         
     else:
-        with st.spinner("🧠 正在呼叫 Gemini Pro 引擎，进行全网深层推理与 HUMINT 画像..."):
+        with st.spinner("🧠 正在呼叫 Gemini 3.1 Pro 超大杯引擎，进行全网深层推理与 HUMINT 画像..."):
             try:
                 gemini_prompt = f"""
                 你是一位隶属于顶尖情报机构的高级 HUMINT（人力情报）与 OSINT 联合分析专家。
                 请基于以下截获的开源情报，调动你强大的网络搜索能力，补充完善情报素材，并进行深度推理，输出《深度研判专报》。
-                
                 【原始线索】：
                 - 标题：{card['title']}
                 - 摘要：{card['summary']}
@@ -277,8 +244,12 @@ elif st.session_state.page == "deep_dive":
                 5. 🔗 交叉验证建议：为了核实真伪，特工应去查阅哪些具体的开源数据库（列出方向）？
                 """
                 
-                model = genai.GenerativeModel('gemini-pro')
-                response = model.generate_content(gemini_prompt)
+                # 🌟 使用全新 SDK 呼叫 3.1 Pro
+                client_gemini = genai.Client(api_key=GEMINI_API_KEY)
+                response = client_gemini.models.generate_content(
+                    model='gemini-3.1-pro-preview', 
+                    contents=gemini_prompt
+                )
                 final_content = response.text
                 
                 supabase.table("deep_dives_db").insert({
@@ -287,14 +258,13 @@ elif st.session_state.page == "deep_dive":
                     "content": final_content
                 }).execute()
                 
-                st.success(f"🔥 Gemini Pro 挖掘完毕！已将此情报永久刻录至团队档案库。")
+                st.success(f"🔥 Gemini 3.1 Pro 挖掘完毕！已将此情报永久刻录至团队档案库。")
                 st.markdown(final_content)
                 
             except Exception as e:
                 st.error(f"Gemini 引擎故障：{e}")
                 final_content = ""
 
-    # 🌟 自动生成 Word 导出文件
     if final_content:
         st.markdown("---")
         docx_data = generate_word_doc(card['title'], final_content)
