@@ -3,5 +3,5 @@ requests
 beautifulsoup4
 openai
 supabase
-google-genai
+anthropic
 python-docx
