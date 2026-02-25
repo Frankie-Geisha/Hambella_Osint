@@ -5,3 +5,4 @@ openai
 supabase
 anthropic
 python-docx
+duckduckgo-search
