@@ -19,7 +19,44 @@ if not all([SUPABASE_URL, SUPABASE_KEY, DEEPSEEK_API_KEY]):
     exit(1)
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# 🌟 V6.0 飞书高危情报警报器
+def send_feishu_alert(report):
+    webhook_url = os.environ.get("FEISHU_WEBHOOK")
+    if not webhook_url:
+        return # 如果没配飞书，就静默跳过
+    
+    score = report.get("score", 0)
+    # 只有 >= 70 分的情报才配拉响警报（可根据需要改成90）
+    if score < 70:
+        return
 
+    title = report.get("title", "无标题")
+    summary = report.get("summary", "无摘要")
+    category = report.get("category", "未知领域")
+    source = report.get("source", "未知来源")
+    publish_time = report.get("publish_time", "未知时间")
+
+    payload = {
+        "msg_type": "post",
+        "content": {
+            "post": {
+                "zh_cn": {
+                    "title": f"🚨 [极高危情报预警] {title}",
+                    "content": [
+                        [{"tag": "text", "text": f"🔥 威胁分值：{score} 分\n"}],
+                        [{"tag": "text", "text": f"📂 情报领域：{category}\n"}],
+                        [{"tag": "text", "text": f"📡 情报来源：{source} | 🕰️ {publish_time}\n\n"}],
+                        [{"tag": "text", "text": f"📝 核心提炼：\n{summary[:800]}..."}] # 截取前800字防超长
+                    ]
+                }
+            }
+        }
+    }
+    try:
+        requests.post(webhook_url, json=payload)
+        print(f"📣 已向飞书发送高危警报：{title}")
+    except Exception as e:
+        print(f"⚠️ 飞书推送失败: {e}")
 # 2. 目标频道清单（必须与主大厅保持同步）
 channel_urls = [
     "https://t.me/s/ejdailyru","https://t.me/s/Ateobreaking", "https://t.me/s/theinsider", "https://t.me/s/moscowtimes_ru",
@@ -155,6 +192,10 @@ def run_auto_scrape():
                         "category": rep.get("category", "Global Macro"), "score": rep.get("score", 0), 
                         "source": rep.get("source", "未知"), "publish_time": rep.get("publish_time", "未知时间")
                     }).execute()
+
+                # 🌟 触发飞书警报检测
+                    send_feishu_alert(rep)
+                    
                 total_saved += len(reports)
             except Exception as e:
                 print(f"🚨 第 {batch_index + 1} 小队 DeepSeek 解析失败：{e}")
