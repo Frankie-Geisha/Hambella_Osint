@@ -241,7 +241,9 @@ with st.sidebar:
     if st.button("👁️ 深渊挖掘档案室", use_container_width=True, type="primary" if st.session_state.page == "deep_dive_list" else "secondary"):
         st.session_state.page = "deep_dive_list"
         st.rerun()
-    
+    if st.button("🗓️ 战略内参简报", use_container_width=True):
+        st.session_state.page = "briefings"
+        st.rerun()
     st.markdown("---")
     st.caption("🌸 花魁 OSINT v4.1 | 协同归档版")
 
@@ -590,6 +592,35 @@ elif st.session_state.page == "deep_dive_list":
 # ==========================================
 # 🌸 7. 独立审讯室：Claude 深度研判行动执行
 # ==========================================
+
+elif st.session_state.page == "briefings":
+    # ==========================================
+    # 🌸 V6.1 独立页面：战略内参简报室
+    # ==========================================
+    st.title("🗓️ 战略内参简报室")
+    if st.button("⬅️ 返回战略情报大厅", type="primary"):
+        st.session_state.page = "main"
+        st.rerun()
+        
+    st.markdown("---")
+    
+    try:
+        # 倒序拉取所有由 Claude 生成的简报（最多显示最近10期）
+        res = supabase.table("briefings_db").select("*").order("created_at", desc=True).limit(10).execute()
+        briefings = res.data
+        
+        if not briefings:
+            st.info("📭 目前档案库中还没有生成任何简报。请等待每日早 8 点系统自动生成，或前往 GitHub Actions 手动发射无人机触发。")
+        else:
+            for b in briefings:
+                period_icon = "🌅" if b['period'] == 'daily' else "🗓️"
+                # 提取简报的第一行作为手风琴折叠框的标题
+                title_line = b['content'].split('\n')[0].replace('# ', '')
+                with st.expander(f"{period_icon} {title_line}", expanded=False):
+                    st.markdown(b['content'])
+    except Exception as e:
+        st.error(f"调取简报档案库失败，数据库链接异常：{e}")
+
 elif st.session_state.page == "deep_dive":
     # ==========================================
     # 🌸 7. 独立战术研判室：Claude Agent (联网搜索 + 军工级模板)
