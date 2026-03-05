@@ -16,101 +16,133 @@ from supabase import create_client, Client
 st.set_page_config(page_title="花魁 OSINT", page_icon="🌸", layout="wide", initial_sidebar_state="expanded")
 
 # ==========================================
-# 🌸 V6.0 商业级 UI 视觉覆写 (iOS 玻璃拟态 & 莫兰迪色系)
+# 🌸 V6.0 商业级 UI 视觉覆写 (iOS 玻璃拟态 + Widget 级内饰排版)
 # ==========================================
 st.markdown("""
 <style>
-    /* 1. 抹除冗余痕迹，设定全局明快背景 */
+    /* 1. 全局底色与冗余清理 */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     .block-container {padding-top: 2rem; padding-bottom: 2rem;}
 
-    /* 设定类似 iOS 的极浅暖灰背景，配合微弱的径向渐变增加空间感 */
     .stApp {
-        background-color: #F4F6F8 !important;
+        background-color: #F8FAFC !important; /* 极浅的蓝灰色背景 */
         background-image: radial-gradient(at 0% 0%, hsla(210, 100%, 98%, 1) 0px, transparent 50%),
                           radial-gradient(at 100% 0%, hsla(340, 100%, 98%, 1) 0px, transparent 50%);
-        color: #334155;
     }
 
-    /* 全局文字颜色调整，使用柔和的深蓝灰，拒绝刺眼的纯黑 */
-    h1, h2, h3, h4, p, span {
-        color: #1E293B !important;
-    }
-
-    /* 2. 情报卡片：极致的毛玻璃拟态 (Glassmorphism) */
+    /* 2. 核心情报卡片外壳 (Widget 化) */
     [data-testid="stVerticalBlockBorderWrapper"] {
-        background: rgba(255, 255, 255, 0.65) !important;
-        backdrop-filter: blur(16px) !important;
-        -webkit-backdrop-filter: blur(16px) !important;
-        border: 1px solid rgba(255, 255, 255, 0.9) !important;
-        border-radius: 24px !important;
-        box-shadow: 0 4px 24px -4px rgba(20, 25, 40, 0.04), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
-        /* 弹簧回弹阻尼动效 (Apple Spring) */
+        background: rgba(255, 255, 255, 0.75) !important; /* 提高白度，让文字更清晰 */
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.8) !important;
+        border-radius: 20px !important;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
         transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s ease !important;
+        padding: 0.5rem !important; /* 增加内部呼吸感 */
     }
     
-    /* 卡片悬浮：像在冰面上轻轻弹起 */
     [data-testid="stVerticalBlockBorderWrapper"]:hover {
         transform: translateY(-4px) scale(1.005) !important;
-        box-shadow: 0 16px 32px -4px rgba(20, 25, 40, 0.08), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
     }
 
-    /* 3. 战术按钮：温润如玉，弹簧微动效 */
-    .stButton > button {
-        border-radius: 14px !important;
-        background: rgba(255, 255, 255, 0.8) !important;
-        border: 1px solid rgba(0, 0, 0, 0.04) !important;
-        color: #475569 !important;
+    /* 🌟 3. 卡片内饰重塑 (文字、行距、层级) 🌟 */
+    
+    /* 大标题 (领域、分数) */
+    [data-testid="stVerticalBlockBorderWrapper"] h2, 
+    [data-testid="stVerticalBlockBorderWrapper"] h3, 
+    [data-testid="stVerticalBlockBorderWrapper"] h4 {
+        color: #1E293B !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+        font-weight: 700 !important;
+        letter-spacing: -0.5px !important; /* 标题紧凑感 */
+        margin-bottom: 0.2rem !important;
+    }
+
+    /* 正文内容 (摘要) */
+    [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stMarkdownContainer"] p {
+        color: #475569 !important; /* 高级深灰，不刺眼 */
+        font-size: 15px !important;
+        line-height: 1.65 !important; /* 增加行距，提升阅读舒适度 */
+    }
+
+    /* 灰色的提示词 (时间、来源、警报) */
+    [data-testid="stCaptionContainer"] {
+        color: #94A3B8 !important;
+        font-size: 13px !important;
         font-weight: 500 !important;
-        backdrop-filter: blur(10px) !important;
+        margin-bottom: 0.5rem !important;
+    }
+
+    /* 优雅的渐变分割线 (干掉死板的黑粗线) */
+    hr {
+        border: none !important;
+        height: 1px !important;
+        background: linear-gradient(to right, rgba(0,0,0,0), rgba(0,0,0,0.06), rgba(0,0,0,0)) !important;
+        margin: 1.2rem 0 !important;
+    }
+
+    /* 4. 折叠框 (展开核心摘要) 完美融合 */
+    [data-testid="stExpander"] {
+        background: rgba(241, 245, 249, 0.5) !important; /* 极浅的蓝灰底色 */
+        border: 1px solid rgba(0, 0, 0, 0.03) !important;
+        border-radius: 12px !important;
+        box-shadow: none !important;
+    }
+    [data-testid="stExpander"] summary {
+        color: #64748B !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+    }
+    [data-testid="stExpander"] summary:hover {
+        color: #334155 !important;
+    }
+
+    /* 5. 战术按钮 (阻尼质感) */
+    .stButton > button {
+        border-radius: 12px !important;
+        background: rgba(255, 255, 255, 0.9) !important;
+        border: 1px solid rgba(0, 0, 0, 0.05) !important;
+        color: #475569 !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
         transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease !important;
     }
-    /* 鼠标悬停放大 */
     .stButton > button:hover {
         transform: scale(1.03) !important;
-        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06) !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
         color: #0F172A !important;
-        border: 1px solid rgba(0, 0, 0, 0.08) !important;
     }
-    /* 鼠标按压时的内缩阻尼感 */
     .stButton > button:active {
-        transform: scale(0.96) !important;
+        transform: scale(0.96) !important; /* 按压回缩 */
     }
     
-    /* 主力按钮(Primary)：莫兰迪高级蓝/灰绿 */
+    /* 莫兰迪主力按钮 */
     .stButton > button[kind="primary"] {
-        background: #7B90A7 !important; /* 莫兰迪蓝灰 */
+        background: #64748B !important; 
         color: white !important;
         border: none !important;
-        box-shadow: 0 4px 12px rgba(123, 144, 167, 0.3) !important;
     }
     .stButton > button[kind="primary"]:hover {
-        background: #6A8198 !important;
-        box-shadow: 0 8px 20px rgba(123, 144, 167, 0.4) !important;
+        background: #475569 !important;
+        box-shadow: 0 6px 16px rgba(100, 116, 139, 0.3) !important;
     }
 
-    /* 4. 侧边栏：磨砂亚克力质感 */
-    [data-testid="stSidebar"] {
-        background-color: rgba(248, 250, 252, 0.7) !important;
-        backdrop-filter: blur(24px) !important;
-        border-right: 1px solid rgba(255,255,255,0.8) !important;
-    }
-    
-    /* 5. 输入框质感：轻微内阴影 */
+    /* 6. 输入框 (批示区) */
     .stTextInput > div > div > input {
-        border-radius: 12px !important;
-        background: rgba(255, 255, 255, 0.5) !important;
-        border: 1px solid rgba(0, 0, 0, 0.05) !important;
+        border-radius: 10px !important;
+        background: rgba(255, 255, 255, 0.7) !important;
+        border: 1px solid rgba(0, 0, 0, 0.06) !important;
         color: #1E293B !important;
-        box-shadow: inset 0 2px 4px rgba(0,0,0,0.02) !important;
-        transition: all 0.3s ease !important;
+        padding: 0.5rem 1rem !important;
     }
     .stTextInput > div > div > input:focus {
-        background: rgba(255, 255, 255, 0.9) !important;
-        border-color: #7B90A7 !important;
-        box-shadow: 0 0 0 2px rgba(123, 144, 167, 0.2) !important;
+        background: #FFFFFF !important;
+        border-color: #94A3B8 !important;
+        box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.2) !important;
     }
 </style>
 """, unsafe_allow_html=True)
