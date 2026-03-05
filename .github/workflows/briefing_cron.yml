@@ -2,39 +2,43 @@ name: 🗓️ 花魁简报系统 (每日8点/周日晚8点)
 
 on:
   schedule:
-    # 每天 UTC 00:00 (北京时间早 08:00) 执行日报
     - cron: '0 0 * * *'
-    # 每周日 UTC 12:00 (北京时间周日晚 20:00) 执行周报
     - cron: '0 12 * * 0'
   workflow_dispatch:
     inputs:
       period_type:
-        description: '手动测试：输入 daily 或 weekly'
+        description: '🎯 手动试射：请选择生成日报还是周报'
         required: true
-        default: 'daily'
+        type: choice
+        options:
+          - daily
+          - weekly
 
 jobs:
   run-briefing:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: 📥 检出最新代码
+        uses: actions/checkout@v4
+        
+      - name: ⚙️ 设置 Python 环境
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      - run: pip install -r requirements.txt
-      
+          
+      - name: 📦 安装军火库依赖
+        run: pip install -r requirements.txt
+        
       - name: 🚀 执行简报引擎
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
-        # 根据触发条件决定跑哪一个，定时任务用 shell 逻辑判断当前是星期几和时间
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             python briefing_generator.py ${{ github.event.inputs.period_type }}
           else
-            # 定时任务触发：如果当前是周日，且是 UTC 12点左右，跑周报
             DAY_OF_WEEK=$(date +%u)
             HOUR=$(date +%H)
             if [ "$DAY_OF_WEEK" -eq 7 ] && [ "$HOUR" -eq 12 ]; then
