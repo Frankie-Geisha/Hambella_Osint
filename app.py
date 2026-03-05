@@ -15,6 +15,75 @@ from supabase import create_client, Client
 # ==========================================
 st.set_page_config(page_title="花魁 OSINT", page_icon="🌸", layout="wide", initial_sidebar_state="expanded")
 
+# ==========================================
+# 🌸 V6.0 商业级 UI 视觉覆写 (军工暗黑风)
+# ==========================================
+st.markdown("""
+<style>
+    /* 1. 彻底抹除 Streamlit 官方痕迹 (右上角菜单、底部水印、顶部空白) */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .block-container {padding-top: 2rem; padding-bottom: 2rem;}
+
+    /* 2. 全局暗黑背景微调 (深邃的午夜蓝黑) */
+    .stApp {
+        background-color: #0E1117;
+    }
+
+    /* 3. 情报卡片 (Container) 悬浮装甲特效 */
+    /* 针对 st.container(border=True) 的精准打击 */
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        border-radius: 12px !important;
+        border: 1px solid #1E2329 !important;
+        background-color: #161A22 !important;
+        transition: all 0.3s ease-in-out;
+    }
+    
+    /* 鼠标划过卡片时的呼吸发光效果 */
+    [data-testid="stVerticalBlockBorderWrapper"]:hover {
+        border: 1px solid #3A3F47 !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 10px rgba(50, 150, 255, 0.15) !important;
+        transform: translateY(-3px);
+    }
+
+    /* 4. 战术按钮微调：更圆润、按压反馈更强 */
+    .stButton > button {
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+        transition: all 0.2s ease-in-out;
+    }
+    .stButton > button:hover {
+        transform: scale(1.02);
+        box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+    }
+    
+    /* 主力按钮(Primary)的专属幽蓝色渐变 */
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #1E3A8A 0%, #0F172A 100%) !important;
+        border: 1px solid #2563EB !important;
+        color: white !important;
+    }
+    .stButton > button[kind="primary"]:hover {
+        background: linear-gradient(135deg, #2563EB 0%, #1E3A8A 100%) !important;
+        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4) !important;
+    }
+
+    /* 5. 侧边栏战术控制台深度定制 */
+    [data-testid="stSidebar"] {
+        background-color: #0B0E14 !important;
+        border-right: 1px solid #1C2128 !important;
+    }
+    
+    /* 6. 输入框质感优化 */
+    .stTextInput > div > div > input {
+        border-radius: 6px !important;
+        background-color: #1A1F27 !important;
+        border: 1px solid #2D333B !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
