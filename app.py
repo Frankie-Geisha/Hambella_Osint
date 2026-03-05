@@ -16,14 +16,15 @@ from supabase import create_client, Client
 st.set_page_config(page_title="花魁 OSINT", page_icon="🌸", layout="wide", initial_sidebar_state="expanded")
 
 # ==========================================
-# 🌸 V6.0 商业级 UI 视觉覆写 (iOS 玻璃拟态 + Widget 级内饰排版)
+# 🌸 V6.0 商业级 UI 视觉覆写 (修复侧边栏 + Widget 级内饰排版)
 # ==========================================
 st.markdown("""
 <style>
-    /* 1. 全局底色与冗余清理 */
+    /* 1. 全局底色与冗余清理 (精准隐蔽，保留侧边栏控制权！) */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
+    .stDeployButton {display: none;} /* 只隐藏 Deploy 按钮，不隐藏整个 Header */
+    [data-testid="stHeader"] {background: transparent !important;} /* 头部透明化 */
     .block-container {padding-top: 2rem; padding-bottom: 2rem;}
 
     .stApp {
@@ -32,16 +33,24 @@ st.markdown("""
                           radial-gradient(at 100% 0%, hsla(340, 100%, 98%, 1) 0px, transparent 50%);
     }
 
+    /* 🌟 修复并升级侧边栏：磨砂亚克力质感 🌟 */
+    [data-testid="stSidebar"] {
+        background-color: rgba(248, 250, 252, 0.75) !important;
+        backdrop-filter: blur(24px) !important;
+        -webkit-backdrop-filter: blur(24px) !important;
+        border-right: 1px solid rgba(0, 0, 0, 0.05) !important;
+    }
+
     /* 2. 核心情报卡片外壳 (Widget 化) */
     [data-testid="stVerticalBlockBorderWrapper"] {
-        background: rgba(255, 255, 255, 0.75) !important; /* 提高白度，让文字更清晰 */
+        background: rgba(255, 255, 255, 0.75) !important; 
         backdrop-filter: blur(20px) !important;
         -webkit-backdrop-filter: blur(20px) !important;
         border: 1px solid rgba(255, 255, 255, 0.8) !important;
         border-radius: 20px !important;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
         transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s ease !important;
-        padding: 0.5rem !important; /* 增加内部呼吸感 */
+        padding: 0.5rem !important; 
     }
     
     [data-testid="stVerticalBlockBorderWrapper"]:hover {
@@ -49,27 +58,24 @@ st.markdown("""
         box-shadow: 0 12px 24px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
     }
 
-    /* 🌟 3. 卡片内饰重塑 (文字、行距、层级) 🌟 */
+    /* 3. 卡片内饰重塑 (文字、行距、层级) */
     
-    /* 大标题 (领域、分数) */
     [data-testid="stVerticalBlockBorderWrapper"] h2, 
     [data-testid="stVerticalBlockBorderWrapper"] h3, 
     [data-testid="stVerticalBlockBorderWrapper"] h4 {
         color: #1E293B !important;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
         font-weight: 700 !important;
-        letter-spacing: -0.5px !important; /* 标题紧凑感 */
+        letter-spacing: -0.5px !important; 
         margin-bottom: 0.2rem !important;
     }
 
-    /* 正文内容 (摘要) */
     [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stMarkdownContainer"] p {
-        color: #475569 !important; /* 高级深灰，不刺眼 */
+        color: #475569 !important; 
         font-size: 15px !important;
-        line-height: 1.65 !important; /* 增加行距，提升阅读舒适度 */
+        line-height: 1.65 !important; 
     }
 
-    /* 灰色的提示词 (时间、来源、警报) */
     [data-testid="stCaptionContainer"] {
         color: #94A3B8 !important;
         font-size: 13px !important;
@@ -77,7 +83,6 @@ st.markdown("""
         margin-bottom: 0.5rem !important;
     }
 
-    /* 优雅的渐变分割线 (干掉死板的黑粗线) */
     hr {
         border: none !important;
         height: 1px !important;
@@ -87,7 +92,7 @@ st.markdown("""
 
     /* 4. 折叠框 (展开核心摘要) 完美融合 */
     [data-testid="stExpander"] {
-        background: rgba(241, 245, 249, 0.5) !important; /* 极浅的蓝灰底色 */
+        background: rgba(241, 245, 249, 0.5) !important; 
         border: 1px solid rgba(0, 0, 0, 0.03) !important;
         border-radius: 12px !important;
         box-shadow: none !important;
@@ -117,10 +122,9 @@ st.markdown("""
         color: #0F172A !important;
     }
     .stButton > button:active {
-        transform: scale(0.96) !important; /* 按压回缩 */
+        transform: scale(0.96) !important; 
     }
     
-    /* 莫兰迪主力按钮 */
     .stButton > button[kind="primary"] {
         background: #64748B !important; 
         color: white !important;
