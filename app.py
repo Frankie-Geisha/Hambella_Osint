@@ -16,71 +16,101 @@ from supabase import create_client, Client
 st.set_page_config(page_title="花魁 OSINT", page_icon="🌸", layout="wide", initial_sidebar_state="expanded")
 
 # ==========================================
-# 🌸 V6.0 商业级 UI 视觉覆写 (军工暗黑风)
+# 🌸 V6.0 商业级 UI 视觉覆写 (iOS 玻璃拟态 & 莫兰迪色系)
 # ==========================================
 st.markdown("""
 <style>
-    /* 1. 彻底抹除 Streamlit 官方痕迹 (右上角菜单、底部水印、顶部空白) */
+    /* 1. 抹除冗余痕迹，设定全局明快背景 */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     .block-container {padding-top: 2rem; padding-bottom: 2rem;}
 
-    /* 2. 全局暗黑背景微调 (深邃的午夜蓝黑) */
+    /* 设定类似 iOS 的极浅暖灰背景，配合微弱的径向渐变增加空间感 */
     .stApp {
-        background-color: #0E1117;
+        background-color: #F4F6F8 !important;
+        background-image: radial-gradient(at 0% 0%, hsla(210, 100%, 98%, 1) 0px, transparent 50%),
+                          radial-gradient(at 100% 0%, hsla(340, 100%, 98%, 1) 0px, transparent 50%);
+        color: #334155;
     }
 
-    /* 3. 情报卡片 (Container) 悬浮装甲特效 */
-    /* 针对 st.container(border=True) 的精准打击 */
+    /* 全局文字颜色调整，使用柔和的深蓝灰，拒绝刺眼的纯黑 */
+    h1, h2, h3, h4, p, span {
+        color: #1E293B !important;
+    }
+
+    /* 2. 情报卡片：极致的毛玻璃拟态 (Glassmorphism) */
     [data-testid="stVerticalBlockBorderWrapper"] {
-        border-radius: 12px !important;
-        border: 1px solid #1E2329 !important;
-        background-color: #161A22 !important;
-        transition: all 0.3s ease-in-out;
+        background: rgba(255, 255, 255, 0.65) !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.9) !important;
+        border-radius: 24px !important;
+        box-shadow: 0 4px 24px -4px rgba(20, 25, 40, 0.04), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
+        /* 弹簧回弹阻尼动效 (Apple Spring) */
+        transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s ease !important;
     }
     
-    /* 鼠标划过卡片时的呼吸发光效果 */
+    /* 卡片悬浮：像在冰面上轻轻弹起 */
     [data-testid="stVerticalBlockBorderWrapper"]:hover {
-        border: 1px solid #3A3F47 !important;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 10px rgba(50, 150, 255, 0.15) !important;
-        transform: translateY(-3px);
+        transform: translateY(-4px) scale(1.005) !important;
+        box-shadow: 0 16px 32px -4px rgba(20, 25, 40, 0.08), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
     }
 
-    /* 4. 战术按钮微调：更圆润、按压反馈更强 */
+    /* 3. 战术按钮：温润如玉，弹簧微动效 */
     .stButton > button {
-        border-radius: 8px !important;
-        font-weight: 600 !important;
-        border: 1px solid rgba(255,255,255,0.1) !important;
-        transition: all 0.2s ease-in-out;
+        border-radius: 14px !important;
+        background: rgba(255, 255, 255, 0.8) !important;
+        border: 1px solid rgba(0, 0, 0, 0.04) !important;
+        color: #475569 !important;
+        font-weight: 500 !important;
+        backdrop-filter: blur(10px) !important;
+        transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease !important;
     }
+    /* 鼠标悬停放大 */
     .stButton > button:hover {
-        transform: scale(1.02);
-        box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+        transform: scale(1.03) !important;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06) !important;
+        color: #0F172A !important;
+        border: 1px solid rgba(0, 0, 0, 0.08) !important;
+    }
+    /* 鼠标按压时的内缩阻尼感 */
+    .stButton > button:active {
+        transform: scale(0.96) !important;
     }
     
-    /* 主力按钮(Primary)的专属幽蓝色渐变 */
+    /* 主力按钮(Primary)：莫兰迪高级蓝/灰绿 */
     .stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #1E3A8A 0%, #0F172A 100%) !important;
-        border: 1px solid #2563EB !important;
+        background: #7B90A7 !important; /* 莫兰迪蓝灰 */
         color: white !important;
+        border: none !important;
+        box-shadow: 0 4px 12px rgba(123, 144, 167, 0.3) !important;
     }
     .stButton > button[kind="primary"]:hover {
-        background: linear-gradient(135deg, #2563EB 0%, #1E3A8A 100%) !important;
-        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4) !important;
+        background: #6A8198 !important;
+        box-shadow: 0 8px 20px rgba(123, 144, 167, 0.4) !important;
     }
 
-    /* 5. 侧边栏战术控制台深度定制 */
+    /* 4. 侧边栏：磨砂亚克力质感 */
     [data-testid="stSidebar"] {
-        background-color: #0B0E14 !important;
-        border-right: 1px solid #1C2128 !important;
+        background-color: rgba(248, 250, 252, 0.7) !important;
+        backdrop-filter: blur(24px) !important;
+        border-right: 1px solid rgba(255,255,255,0.8) !important;
     }
     
-    /* 6. 输入框质感优化 */
+    /* 5. 输入框质感：轻微内阴影 */
     .stTextInput > div > div > input {
-        border-radius: 6px !important;
-        background-color: #1A1F27 !important;
-        border: 1px solid #2D333B !important;
+        border-radius: 12px !important;
+        background: rgba(255, 255, 255, 0.5) !important;
+        border: 1px solid rgba(0, 0, 0, 0.05) !important;
+        color: #1E293B !important;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.02) !important;
+        transition: all 0.3s ease !important;
+    }
+    .stTextInput > div > div > input:focus {
+        background: rgba(255, 255, 255, 0.9) !important;
+        border-color: #7B90A7 !important;
+        box-shadow: 0 0 0 2px rgba(123, 144, 167, 0.2) !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -133,8 +163,9 @@ channel_urls = [
     "https://t.me/s/thehegemonist","https://t.me/s/budni_manipulyatora","https://t.me/s/ManoiloToday","https://t.me/s/rtechnocom",
     "https://t.me/s/darpaandcia","https://t.me/s/istories_media","https://t.me/s/mediazona_exclusive","https://t.me/s/Russian_OSINT",
     "https://t.me/s/alter_academy","https://t.me/s/rybar_mena","https://t.me/s/rybar_pacific","https://t.me/s/mosnews","https://t.me/s/brieflyru"
-]
-VIP_CHANNELS = ["anserenko", "kremlin_sekret","rybar","Russian_OSINT","rybar_mena","rybar_pacific","topwar_official"] 
+    "https://t.me/s/FarsNewsInt","https://t.me/s/borisenkoD","https://t.me/s/Shiryaev_and_Shiryaev","https://t.me/s/rusbri",
+    "https://t.me/s/MedvedevVesti","https://t.me/s/rybar_america","https://t.me/s/russ_orientalist","https://t.me/s/voinasordoy",]  
+VIP_CHANNELS = ["anserenko", "kremlin_sekret","https://t.me/s/rybar_america","rybar","Russian_OSINT","rybar_mena","rybar_pacific","topwar_official"] 
 
 def load_bookmarks():
     try:
