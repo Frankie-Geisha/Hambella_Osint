@@ -4,15 +4,8 @@ on:
   schedule:
     - cron: '0 0 * * *'
     - cron: '0 12 * * 0'
-  workflow_dispatch:
-    inputs:
-      period_type:
-        description: '🎯 手动试射：请选择生成日报还是周报'
-        required: true
-        type: choice
-        options:
-          - daily
-          - weekly
+  # 🌟 战术降级：彻底砍掉所有复杂的输入参数，强制裸奔！
+  workflow_dispatch: 
 
 jobs:
   run-briefing:
@@ -36,9 +29,11 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
         run: |
+          # 只要是手动点击的，一律强制生成 daily（日报）进行测试！
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            python briefing_generator.py ${{ github.event.inputs.period_type }}
+            python briefing_generator.py daily
           else
+            # 云端定时任务的自动判断逻辑保持不变
             DAY_OF_WEEK=$(date +%u)
             HOUR=$(date +%H)
             if [ "$DAY_OF_WEEK" -eq 7 ] && [ "$HOUR" -eq 12 ]; then
