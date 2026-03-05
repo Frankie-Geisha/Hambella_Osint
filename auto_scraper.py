@@ -26,8 +26,8 @@ def send_feishu_alert(report):
         return # 如果没配飞书，就静默跳过
     
     score = report.get("score", 0)
-    # 只有 >= 70 分的情报才配拉响警报（可根据需要改成90）
-    if score < 70:
+    # 只有 >= 85 分的情报才配拉响警报（可根据需要改成90）
+    if score < 85:
         return
 
     title = report.get("title", "无标题")
@@ -41,7 +41,7 @@ def send_feishu_alert(report):
         "content": {
             "post": {
                 "zh_cn": {
-                    "title": f"🚨 [极高危情报预警] {title}",
+                    "title": f"🚨 [重要战术预警] {title}",
                     "content": [
                         [{"tag": "text", "text": f"🔥 威胁分值：{score} 分\n"}],
                         [{"tag": "text", "text": f"📂 情报领域：{category}\n"}],
