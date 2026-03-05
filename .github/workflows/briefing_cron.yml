@@ -1,7 +1,6 @@
 name: Briefing System
 
-on:
-  workflow_dispatch:
+on: [push]
 
 jobs:
   test-run:
