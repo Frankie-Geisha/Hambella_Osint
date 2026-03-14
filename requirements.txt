@@ -6,3 +6,4 @@ supabase
 anthropic
 python-docx
 duckduckgo-search
+tavily-python
