@@ -420,35 +420,68 @@ if st.session_state.page == "main":
                                 except:
                                     st.toast("⚠️ 这条情报您之前已经归档过了！")
 
-                        # 🌟 V6.2 一键深度溯源引擎 (Tavily) ---------------------
-                        with st.expander("🌐 展开 Tavily 深度溯源与核实"):
-                            if st.button("🚀 立刻扫描全网获取深度线索", key=f"tavily_{card['id']}", use_container_width=True):
+                        # 🌟 V6.3 跨语种智能溯源引擎 (LLM + Tavily 联合行动) ---------------------
+                        with st.expander("🌐 展开跨语种深度溯源与核实"):
+                            if st.button("🚀 启动 AI 净化版全网追踪", key=f"tavily_{card['id']}", use_container_width=True):
                                 TAVILY_API_KEY = st.secrets.get("TAVILY_API_KEY")
-                                if not TAVILY_API_KEY:
-                                    st.error("🚨 缺少 Tavily 军火库密钥，请在后台 Secrets 中配置！")
+                                DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY") # 调用你大厅里现成的 DeepSeek 大脑
+                                
+                                if not TAVILY_API_KEY or not DEEPSEEK_API_KEY:
+                                    st.error("🚨 缺少 Tavily 或 DeepSeek 军火库密钥，请检查 Secrets！")
                                 else:
-                                    with st.spinner("📡 正在调用 Tavily 军用级雷达，穿透信息迷雾寻找关联线索..."):
+                                    # 引入大模型客户端
+                                    from openai import OpenAI
+                                    llm_client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com")
+                                    tavily = TavilyClient(api_key=TAVILY_API_KEY)
+                                    
+                                    with st.spinner("🧠 阶段 1/3：AI 正在将中文情报转化为极简英文 OSINT 检索指纹..."):
                                         try:
-                                            # 启动 Tavily 客户端
-                                            tavily = TavilyClient(api_key=TAVILY_API_KEY)
+                                            # 1. 语种转换：生成最专业的英文搜索词
+                                            q_prompt = f"请将以下中文情报转化为极其简练、专业的英文 OSINT (开源情报) 搜索词。只需返回一段英文搜索词，不要任何解释：\n标题：{card['title']}\n领域：{card['category']}"
+                                            q_res = llm_client.chat.completions.create(
+                                                model="deepseek-chat",
+                                                messages=[{"role": "user", "content": q_prompt}],
+                                                temperature=0.1
+                                            )
+                                            eng_query = q_res.choices[0].message.content.strip()
+                                            st.info(f"📡 已生成外网追踪指纹：`{eng_query}`")
                                             
-                                            # 构建高精度搜索词（标题 + 类别）
-                                            search_query = f"{card['title']} {card['category']} latest developments facts"
-                                            
-                                            # 发起 Advanced 深度搜索
-                                            response = tavily.search(query=search_query, search_depth="advanced", max_results=5)
-                                            
-                                            st.success("🎯 溯源雷达扫描完毕！发现以下高价值外部线索：")
-                                            
-                                            # 渲染美观的搜索结果面板
-                                            with st.container(border=True):
-                                                for idx, result in enumerate(response.get('results', [])):
-                                                    st.markdown(f"**{idx+1}. [{result['title']}]({result['url']})**")
-                                                    st.caption(f"📝 核心提炼：{result['content']}")
-                                                    st.markdown("<hr style='margin: 0.5rem 0; opacity: 0.3;'>", unsafe_allow_html=True)
-                                                    
+                                            with st.spinner("🌐 阶段 2/3：Tavily 正在深入外网暗面抓取生肉情报..."):
+                                                # 2. 深入敌后：发起 Advanced 深度搜索
+                                                t_response = tavily.search(query=eng_query, search_depth="advanced", max_results=5)
+                                                raw_results = t_response.get('results', [])
+                                                
+                                                if not raw_results:
+                                                    st.warning("⚠️ 目标隐藏极深，未能在外网发现相关高价值线索。")
+                                                else:
+                                                    with st.spinner("🗜️ 阶段 3/3：AI 正在剔除信息噪音，执行军工级中文提纯..."):
+                                                        # 3. 降噪与翻译：用 AI 进行中文提纯
+                                                        clean_prompt = f"""
+                                                        你是一名极度冷酷的情报提纯专家。我将给你提供关于【{card['title']}】的外网搜索原始数据（包含大量噪音、广告、冗长废话）。
+                                                        请你执行以下操作：
+                                                        1. 彻底剔除所有广告和无关新闻。
+                                                        2. 将核心事实提炼成极其精炼的中文，直接说重点。
+                                                        3. 评估这些外网信息是“证实”、“伪造”还是“补充”了原情报。
+                                                        4. 在每条事实的末尾，必须附带其原始的URL链接。
+                                                        请用结构化的 Markdown 列表输出，排版要明快、锐利。
+                                                        
+                                                        【外网原始生肉数据】：
+                                                        {raw_results}
+                                                        """
+                                                        c_res = llm_client.chat.completions.create(
+                                                            model="deepseek-chat",
+                                                            messages=[{"role": "user", "content": clean_prompt}],
+                                                            temperature=0.3
+                                                        )
+                                                        final_report = c_res.choices[0].message.content
+                                                        
+                                                        st.success("🎯 联合行动完成！已为您提取脱水版跨网情报：")
+                                                        # 渲染极致排版的最终结果
+                                                        with st.container(border=True):
+                                                            st.markdown(final_report)
+                                                            
                                         except Exception as e:
-                                            st.error(f"📡 雷达遭遇强干扰，搜索失败：{e}")
+                                            st.error(f"📡 联合行动遭遇系统级拦截：{e}")
                         # --------------------------------------------------------
             
             # ==========================================
