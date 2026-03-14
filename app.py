@@ -9,6 +9,8 @@ import json
 import os
 from duckduckgo_search import DDGS  # 🌟 破壁行动：开源信息核查引擎
 from supabase import create_client, Client
+from tavily import TavilyClient
+import os
 
 # ==========================================
 # 🌸 1. 网页基础与【页面路由及身份系统】
@@ -417,6 +419,37 @@ if st.session_state.page == "main":
                                     st.toast("✅ 成功存入您的私人归档库！")
                                 except:
                                     st.toast("⚠️ 这条情报您之前已经归档过了！")
+
+                        # 🌟 V6.2 一键深度溯源引擎 (Tavily) ---------------------
+                        with st.expander("🌐 展开 Tavily 深度溯源与核实"):
+                            if st.button("🚀 立刻扫描全网获取深度线索", key=f"tavily_{card['id']}", use_container_width=True):
+                                TAVILY_API_KEY = st.secrets.get("TAVILY_API_KEY")
+                                if not TAVILY_API_KEY:
+                                    st.error("🚨 缺少 Tavily 军火库密钥，请在后台 Secrets 中配置！")
+                                else:
+                                    with st.spinner("📡 正在调用 Tavily 军用级雷达，穿透信息迷雾寻找关联线索..."):
+                                        try:
+                                            # 启动 Tavily 客户端
+                                            tavily = TavilyClient(api_key=TAVILY_API_KEY)
+                                            
+                                            # 构建高精度搜索词（标题 + 类别）
+                                            search_query = f"{card['title']} {card['category']} latest developments facts"
+                                            
+                                            # 发起 Advanced 深度搜索
+                                            response = tavily.search(query=search_query, search_depth="advanced", max_results=5)
+                                            
+                                            st.success("🎯 溯源雷达扫描完毕！发现以下高价值外部线索：")
+                                            
+                                            # 渲染美观的搜索结果面板
+                                            with st.container(border=True):
+                                                for idx, result in enumerate(response.get('results', [])):
+                                                    st.markdown(f"**{idx+1}. [{result['title']}]({result['url']})**")
+                                                    st.caption(f"📝 核心提炼：{result['content']}")
+                                                    st.markdown("<hr style='margin: 0.5rem 0; opacity: 0.3;'>", unsafe_allow_html=True)
+                                                    
+                                        except Exception as e:
+                                            st.error(f"📡 雷达遭遇强干扰，搜索失败：{e}")
+                        # --------------------------------------------------------
             
             # ==========================================
             # 模式 2：信息瀑布模式 (三列高低错落排布)
